@@ -375,7 +375,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
         <div id="calList"></div>
         <div class="planhead">
           <button class="filebtn" id="planBtn">Suggest my day</button>
-          <span class="microlabel">rule-based — fits your Top 3 into free gaps, deep work in peak hours</span>
+          <span class="microlabel">Claude plans around your calendar, peak hours and Top 3 — rules as fallback</span>
         </div>
         <div id="dayPlan"></div>
       </div>
@@ -411,7 +411,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   </div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2>Needs your call</h2><span class="microlabel" id="inboxCount"></span>
-    <button class="ghostbtn" id="sortInbox" style="margin-left:auto;padding:3px 10px">Auto-sort these</button>
+    <button class="ghostbtn" id="sortInbox" style="margin-left:auto;padding:3px 10px">Sort: rules + Claude</button>
   </div>
   <div id="inboxList"></div>
 </section>
@@ -514,10 +514,10 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 └── dashboard/            ← this page, backed by Supabase</pre>
       </div>
       <div class="panel">
-        <h2 style="margin-bottom:8px">Later versions <span class="plannedtag">parked</span></h2>
-        <div class="sys-item"><span class="k">Wiki</span><span class="v">Compository of templates, tools, SOPs — lives in the vault once it exists</span></div>
-        <div class="sys-item"><span class="k">AI day-planner</span><span class="v">"Suggest my day" upgraded to Claude once your Anthropic API key is set up</span></div>
-        <div class="sys-item"><span class="k">AI capture sort</span><span class="v">Claude Haiku classifies what the keyword rules can't (per build spec)</span></div>
+        <h2 style="margin-bottom:8px">AI layer <span class="plannedtag" style="background:var(--personal-soft);color:var(--personal)">live</span></h2>
+        <div class="sys-item"><span class="k">AI day planner</span><span class="v">Claude Opus, via the <span style="font-family:var(--f-mono);font-size:12px">plan-day</span> edge function — every run and its cost logged on the Auto tab</span></div>
+        <div class="sys-item"><span class="k">AI capture sort</span><span class="v">Claude Haiku, via <span style="font-family:var(--f-mono);font-size:12px">classify</span> — rules run free first, AI handles the rest (per build spec)</span></div>
+        <div class="sys-item"><span class="k">Later</span><span class="v">Wiki/templates compository (vault) · scheduled NAS runs of the classifier</span></div>
       </div>
     </div>
   </div>
@@ -705,6 +705,21 @@ const bc="BroadcastChannel" in window?new BroadcastChannel("trios"):null;
 function ping(){if(bc)bc.postMessage("sync");}
 if(bc)bc.onmessage=()=>fetchAll();
 
+/* edge function call + automation registry helpers */
+async function fnCall(name,body){
+  if(session&&session.expires_at-Date.now()/1000<90){try{await refreshSession();}catch(e){}}
+  const r=await fetch(SB_URL+"/functions/v1/"+name,{method:"POST",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},
+    body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||(name+" failed ("+r.status+")"));
+  return j;
+}
+async function registerAutomation(slug,name,description,schedule="on demand"){
+  try{await api("automations?on_conflict=user_id,slug",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",
+    body:{user_id:session.user.id,slug,name,kind:"edge_function",schedule,description}});}catch(e){}
+}
+
 /* ================= calendar ================= */
 let calCache={events:[],errors:[],fetched:0};
 try{calCache=JSON.parse(localStorage.getItem(CKEY))||calCache;}catch(e){}
@@ -724,10 +739,9 @@ async function fetchCalendars(force){
     localStorage.setItem(CKEY,JSON.stringify(calCache));
     if(!fetchCalendars._registered){
       fetchCalendars._registered=true;
-      api("automations?on_conflict=user_id,slug",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",
-        body:{user_id:session.user.id,slug:"calendar",name:"Calendar fetch",kind:"edge_function",
-          schedule:"every ~10 min while a dashboard is open",
-          description:"Pulls your iCal feeds through the calendar edge function. Every run is logged below."}}).catch(()=>{});
+      registerAutomation("calendar","Calendar fetch",
+        "Pulls your iCal feeds through the calendar edge function. Every run is logged below.",
+        "every ~10 min while a dashboard is open");
     }
   }catch(ex){calCache.errors=[String(ex.message||ex)]; console.warn(ex);}
   renderCalendar();
@@ -803,17 +817,51 @@ function buildPlan(){
   ].sort((a,b)=>a.s-b.s);
   return {rows,unplaced};
 }
-document.getElementById("planBtn").addEventListener("click",()=>{
+function renderRulePlan(prefix){
   const plan=buildPlan();
   const el=document.getElementById("dayPlan");
-  if(plan.note){el.innerHTML=`<div class="empty">${plan.note}</div>`;return;}
-  let html=plan.rows.map(r=>r.kind==="event"
+  if(plan.note){el.innerHTML=`<div class="empty">${prefix?esc(prefix)+" — ":""}${plan.note}</div>`;return;}
+  let html=prefix?`<div class="sub" style="margin-bottom:6px">${esc(prefix)}</div>`:"";
+  html+=plan.rows.map(r=>r.kind==="event"
     ?`<div class="schedrow"><span class="when">${fmtT(r.s)}–${fmtT(r.e)}</span><span class="what">${esc(r.title)}</span><span class="microlabel">meeting</span></div>`
     :`<div class="schedrow task"><span class="when">${fmtT(r.s)}–${fmtT(r.e)}</span><span class="what">${r.mit?"★ ":""}${esc(r.t.title)}</span>${energyChip(r.t.energy)}</div>`
   ).join("");
   if(plan.unplaced&&plan.unplaced.length) html+=`<div class="sub" style="margin-top:6px">Couldn't fit: ${plan.unplaced.map(t=>esc(t.title)).join(" · ")} — the day's full.</div>`;
-  html+=`<div class="sub" style="margin-top:6px">A suggestion, not a contract — deep work sits in your peak window (${S.settings.peakStart}:00–${S.settings.peakEnd}:00), light tasks after.</div>`;
+  html+=`<div class="sub" style="margin-top:6px">Rule-based plan — deep work in your peak window (${S.settings.peakStart}:00–${S.settings.peakEnd}:00), light tasks after.</div>`;
   el.innerHTML=html;
+}
+function renderAIPlan(j){
+  const el=document.getElementById("dayPlan");
+  const kinds={focus:"deep work",meeting:"meeting",admin:"admin",break:"break"};
+  let html=(j.plan.blocks||[]).map(b=>{
+    const isTask=b.kind==="focus"||b.kind==="admin";
+    return `<div class="schedrow ${isTask?"task":""}"><span class="when">${esc(b.start)}–${esc(b.end)}</span><span class="what">${esc(b.title)}</span><span class="microlabel">${kinds[b.kind]||esc(b.kind)}</span></div>`;
+  }).join("")||`<div class="empty">Claude returned an empty plan — star some tasks first.</div>`;
+  if(j.plan.advice) html+=`<div class="sub" style="margin-top:6px">${esc(j.plan.advice)}</div>`;
+  html+=`<div class="sub" style="margin-top:4px">Planned by Claude · $${(j.cost_usd||0).toFixed(2)} · a suggestion, not a contract.</div>`;
+  el.innerHTML=html;
+}
+const hhmmLocal=d=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+document.getElementById("planBtn").addEventListener("click",async()=>{
+  const el=document.getElementById("dayPlan");
+  el.innerHTML=`<div class="empty">Asking Claude to plan your day…</div>`;
+  const today=todayStr(), now=new Date();
+  try{
+    const j=await fnCall("plan-day",{
+      now:hhmmLocal(now),
+      settings:S.settings&&{peakStart:S.settings.peakStart,peakEnd:S.settings.peakEnd,workStart:S.settings.workStart,workEnd:S.settings.workEnd},
+      top3:mits(today).filter(t=>t.status==="open").map(t=>({id:t.id,title:t.title,domain:t.domain,energy:t.energy})),
+      otherTasks:open().filter(t=>t.mit!==today).slice(0,25).map(t=>({id:t.id,title:t.title,domain:t.domain,energy:t.energy,due:t.due})),
+      events:calCache.events.filter(e=>!e.allDay&&new Date(e.start).toLocaleDateString("en-CA")===today&&new Date(e.end)>now)
+        .map(e=>({title:e.title,start:hhmmLocal(new Date(e.start)),end:hhmmLocal(new Date(e.end))}))
+    });
+    renderAIPlan(j);
+    registerAutomation("ai-planner","AI day planner",
+      "Claude Opus plans the rest of your day around your calendar, peak hours, and Top 3. Runs from the Suggest my day button.");
+    fetchAll();
+  }catch(ex){
+    renderRulePlan("Claude unavailable ("+String(ex.message||ex).slice(0,80)+") — falling back to rules");
+  }
 });
 
 /* ================= domain logic ================= */
@@ -903,15 +951,34 @@ document.getElementById("dumpAdd").addEventListener("click",()=>{
 document.getElementById("sortInbox").addEventListener("click",()=>{
   mutate(async()=>{
     let filed=0;
+    const leftovers=[];
     for(const item of [...S.inbox]){
       const g=suggest(item.text);
       if(g.type==="idea"){await dbInsert("ideas",{text:item.text.replace(/^idea[:\s]+/i,"")});}
       else if(g.type==="learning"){await dbInsert("learning",{title:item.text,kind:"skill"});}
       else if(g.confident){await dbInsert("tasks",{title:item.text,domain:g.domain,energy:"med",work:g.domain==="ats"?"next":null});}
-      else continue;
+      else{leftovers.push(item); continue;}
       await dbDelete("inbox",item.id); filed++;
     }
-    toast(filed?filed+" auto-filed — the rest genuinely need you":"None of these are clear-cut — they're all yours");
+    if(!leftovers.length){toast(filed?filed+" filed by rules":"Inbox already sorted"); return;}
+    toast(filed+" filed by rules — asking Claude about the other "+leftovers.length+"…");
+    try{
+      const j=await fnCall("classify",{items:leftovers.map(x=>({id:x.id,text:x.text}))});
+      let aiFiled=0;
+      for(const res of j.results||[]){
+        if(!(res.confidence>=0.7)) continue;
+        const item=S.inbox.find(x=>x.id===res.id); if(!item) continue;
+        if(res.type==="idea") await dbInsert("ideas",{text:item.text});
+        else if(res.type==="learning") await dbInsert("learning",{title:item.text,kind:"skill"});
+        else await dbInsert("tasks",{title:item.text,domain:res.domain,energy:res.energy,work:res.domain==="ats"?"next":null});
+        await dbDelete("inbox",item.id); aiFiled++;
+      }
+      registerAutomation("ai-classify","AI capture classifier",
+        "Claude Haiku sorts what the keyword rules can't. Runs from the Sort button now; scheduled on the NAS in Phase 2.");
+      toast(`${filed} by rules · ${aiFiled} by Claude ($${(j.cost_usd||0).toFixed(3)}) · ${S.inbox.length?S.inbox.length+" still need you":"inbox zero"}`);
+    }catch(ex){
+      toast(filed+" by rules · Claude unavailable: "+String(ex.message||ex).slice(0,80));
+    }
   })();
 });
 
