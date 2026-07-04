@@ -1,0 +1,957 @@
+<title>TriOS — Life Command Centre</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#F2F4F7; --card:#FFFFFF; --card2:#E9EDF2; --ink:#1B222C; --muted:#5A6675;
+  --line:#D5DBE3; --line2:#C3CBD6;
+  --ats:#1D5AAD; --promitor:#A855D6; --personal:#1F8A3D;
+  --ats-soft:#E3ECF7; --promitor-soft:#F3E9FA; --personal-soft:#E4F2E8;
+  --amber:#A8730A; --amber-soft:#F7EDD8; --crit:#B3341F; --crit-soft:#F8E5E1;
+  --peak:#F5EEDC; --shadow:0 1px 3px rgba(27,34,44,.08),0 4px 14px rgba(27,34,44,.05);
+  --f-ui:"Avenir Next","Avenir","Segoe UI",system-ui,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12161C; --card:#1A202A; --card2:#232B37; --ink:#E6EAF0; --muted:#98A3B3;
+  --line:#2C3543; --line2:#3A4556;
+  --ats:#5E96E0; --promitor:#C670C2; --personal:#3FAE5E;
+  --ats-soft:#1E2A3C; --promitor-soft:#33243A; --personal-soft:#1C2F22;
+  --amber:#C08828; --amber-soft:#332A17; --crit:#D9604B; --crit-soft:#3A211C;
+  --peak:#241F14; --shadow:0 1px 3px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+}}
+:root[data-theme="light"]{
+  --bg:#F2F4F7; --card:#FFFFFF; --card2:#E9EDF2; --ink:#1B222C; --muted:#5A6675;
+  --line:#D5DBE3; --line2:#C3CBD6;
+  --ats:#1D5AAD; --promitor:#A855D6; --personal:#1F8A3D;
+  --ats-soft:#E3ECF7; --promitor-soft:#F3E9FA; --personal-soft:#E4F2E8;
+  --amber:#A8730A; --amber-soft:#F7EDD8; --crit:#B3341F; --crit-soft:#F8E5E1;
+  --peak:#F5EEDC; --shadow:0 1px 3px rgba(27,34,44,.08),0 4px 14px rgba(27,34,44,.05);
+}
+:root[data-theme="dark"]{
+  --bg:#12161C; --card:#1A202A; --card2:#232B37; --ink:#E6EAF0; --muted:#98A3B3;
+  --line:#2C3543; --line2:#3A4556;
+  --ats:#5E96E0; --promitor:#C670C2; --personal:#3FAE5E;
+  --ats-soft:#1E2A3C; --promitor-soft:#33243A; --personal-soft:#1C2F22;
+  --amber:#C08828; --amber-soft:#332A17; --crit:#D9604B; --crit-soft:#3A211C;
+  --peak:#241F14; --shadow:0 1px 3px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--ats);outline-offset:2px;border-radius:4px}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:7px 10px}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- shell ---------- */
+#app{display:grid;grid-template-columns:78px 1fr;grid-template-rows:58px 1fr;height:100vh;height:100dvh}
+header{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line)}
+.logo{font-weight:700;font-size:17px;letter-spacing:.02em}
+.logo span{color:var(--muted);font-weight:500}
+#clock{font:600 15px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+#capture{flex:1;max-width:520px;min-width:120px}
+#capture input{width:100%}
+.hbtn{padding:7px 13px;border-radius:7px;border:1px solid var(--line2);background:var(--card);font-weight:600;font-size:13px;white-space:nowrap}
+.hbtn:hover{background:var(--card2)}
+.hbtn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+nav{display:flex;flex-direction:column;gap:2px;padding:10px 8px;background:var(--card);border-right:1px solid var(--line)}
+nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px;border-radius:8px;color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;position:relative}
+nav button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.active{background:var(--card2);color:var(--ink)}
+nav button:hover{color:var(--ink)}
+.badge{position:absolute;top:4px;right:8px;min-width:16px;height:16px;border-radius:8px;background:var(--amber);color:#fff;font:700 10px/16px var(--f-mono);text-align:center;padding:0 4px}
+:root[data-theme="light"] .badge{color:#fff}
+
+main{overflow-y:auto;padding:20px 22px 60px}
+section[data-view]{display:none;max-width:1240px;margin:0 auto}
+section[data-view].active{display:block}
+h1{font-size:21px;font-weight:700;margin:0 0 4px}
+h2{font-size:15px;font-weight:700;margin:0}
+.sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+.microlabel{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- chips & dots ---------- */
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.dot.ats{background:var(--ats)}.dot.promitor{background:var(--promitor)}.dot.personal{background:var(--personal)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:600;background:var(--card2);color:var(--muted);white-space:nowrap}
+.chip.dom-ats{background:var(--ats-soft);color:var(--ats)}
+.chip.dom-promitor{background:var(--promitor-soft);color:var(--promitor)}
+.chip.dom-personal{background:var(--personal-soft);color:var(--personal)}
+.chip.energy{font-family:var(--f-mono);font-size:10.5px}
+.chip.warn{background:var(--amber-soft);color:var(--amber)}
+.chip.crit{background:var(--crit-soft);color:var(--crit)}
+.chip.stu{background:var(--ats-soft);color:var(--ats);border:1px dashed var(--ats)}
+
+/* ---------- cards ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .num{font:700 26px/1.1 var(--f-mono);font-variant-numeric:tabular-nums;margin-top:4px}
+.tile .microlabel{display:flex;align-items:center;gap:6px}
+
+/* ---------- task cards ---------- */
+.tcard{display:flex;align-items:flex-start;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:7px}
+.tcard[draggable="true"]{cursor:grab}
+.tcard.dragging{opacity:.45}
+.tcard.done .ttl{text-decoration:line-through;color:var(--muted)}
+.chk{width:19px;height:19px;border:1.6px solid var(--line2);border-radius:5px;flex:none;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent}
+.chk.on{background:var(--personal);border-color:var(--personal);color:#fff}
+.tbody{flex:1;min-width:0}
+.ttl{font-weight:600;font-size:14px;overflow-wrap:break-word}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.tact{display:flex;gap:2px;flex:none}
+.tact button{width:26px;height:26px;border-radius:6px;color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center}
+.tact button:hover{background:var(--card2);color:var(--ink)}
+.tact .star.on{color:var(--amber)}
+
+/* ---------- columns ---------- */
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.col{background:var(--card2);border-radius:10px;padding:11px;min-height:180px}
+.col.dropping{outline:2px dashed var(--line2);outline-offset:-4px}
+.colhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.colhead .count{font:600 12px var(--f-mono);color:var(--muted);margin-left:auto}
+.coladd{display:flex;gap:6px;margin-bottom:9px}
+.coladd input{flex:1;min-width:0;font-size:13px;padding:6px 9px}
+.coladd button{padding:6px 11px;border-radius:6px;background:var(--card);border:1px solid var(--line2);font-weight:700;font-size:14px}
+
+/* ---------- today ---------- */
+.today-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+.mitcard{display:flex;align-items:flex-start;gap:11px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:8px;padding:12px 13px;margin-bottom:8px}
+.mitcard .n{font:700 15px var(--f-mono);color:var(--amber);margin-top:1px}
+.empty{color:var(--muted);font-size:13.5px;padding:14px;text-align:center;border:1.5px dashed var(--line2);border-radius:8px}
+.checkmsg{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.checkmsg:last-child{border-bottom:none}
+.checkmsg .sig{flex:none;width:8px;height:8px;border-radius:50%;margin-top:6px}
+.sig.ok{background:var(--personal)}.sig.warn{background:var(--amber)}.sig.crit{background:var(--crit)}.sig.info{background:var(--muted)}
+
+/* energy strip */
+.strip{position:relative;height:64px;background:var(--card);border:1px solid var(--line);border-radius:8px;margin:10px 0 6px;overflow:hidden}
+.zone{position:absolute;top:0;bottom:0}
+.zone.peak{background:var(--peak)}
+.zone.ats-band{border-left:2px solid var(--ats);border-right:2px solid var(--ats);opacity:.55}
+.tick{position:absolute;bottom:3px;font:600 10px var(--f-mono);color:var(--muted);transform:translateX(-50%)}
+.zlabel{position:absolute;top:5px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.zlabel.peak-l{color:var(--amber)}
+.zlabel.ats-l{color:var(--ats)}
+.nowline{position:absolute;top:0;bottom:0;width:2px;background:var(--crit)}
+.lanes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.lane{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:5px;background:var(--card2);color:var(--muted)}
+.lane b{color:var(--ink)}
+
+/* picker */
+.pickrow{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid var(--line)}
+.pickrow:last-child{border-bottom:none}
+.pickrow .ttl{font-size:13.5px;font-weight:500;flex:1;min-width:0}
+.starbtn{font-size:17px;color:var(--line2);width:28px;height:28px;flex:none}
+.starbtn.on{color:var(--amber)}
+.filters{display:flex;gap:6px;margin-bottom:8px}
+.fbtn{padding:4px 11px;border-radius:6px;font-size:12px;font-weight:600;color:var(--muted);background:var(--card2)}
+.fbtn.active{background:var(--ink);color:var(--bg)}
+
+/* ---------- brain dump ---------- */
+.dumpbox textarea{width:100%;min-height:110px;resize:vertical}
+.triage{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:9px}
+.triage .txt{font-weight:600;margin-bottom:9px}
+.optrow{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;align-items:center}
+.optrow .microlabel{width:58px;flex:none}
+.opt{padding:3px 11px;border-radius:6px;font-size:12px;font-weight:600;background:var(--card2);color:var(--muted);border:1px solid transparent}
+.opt.sel{border-color:var(--ink);color:var(--ink);background:var(--card)}
+.opt.sel.o-ats{border-color:var(--ats);color:var(--ats);background:var(--ats-soft)}
+.opt.sel.o-promitor{border-color:var(--promitor);color:var(--promitor);background:var(--promitor-soft)}
+.opt.sel.o-personal{border-color:var(--personal);color:var(--personal);background:var(--personal-soft)}
+.triage .act{display:flex;gap:8px;margin-top:4px}
+.filebtn{padding:6px 16px;border-radius:7px;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px}
+.ghostbtn{padding:6px 12px;border-radius:7px;color:var(--muted);font-size:13px;border:1px solid var(--line2)}
+
+/* ---------- work board ---------- */
+.workgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stuadd{display:flex;gap:7px;margin:12px 0}
+.stuadd input{flex:1}
+
+/* ---------- learning ---------- */
+.learn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.addform{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.addform input[type=text]{flex:2;min-width:160px}
+.addform input.lnk{flex:2;min-width:140px}
+.addform select{flex:0}
+.lcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 11px;margin-bottom:7px}
+.lcard .kind{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lcard .ttl{margin:3px 0 6px}
+.lcard a{color:var(--ats);font-size:12.5px;word-break:break-all}
+.lmove{display:flex;gap:4px;margin-top:6px}
+.lmove button{padding:3px 9px;border-radius:5px;background:var(--card2);font-size:12px;font-weight:600;color:var(--muted)}
+.lmove button:hover{color:var(--ink)}
+
+/* ideas */
+.ideawall{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.idea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+.idea .txt{font-weight:500;font-size:13.5px;flex:1}
+.idea .act{display:flex;gap:4px;flex-wrap:wrap}
+.idea .act button{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--card2);color:var(--muted)}
+.idea .act button:hover{color:var(--ink)}
+
+/* ---------- dialogs ---------- */
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:20px;max-width:440px;width:92vw;box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,14,20,.45)}
+.frow{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
+.frow label{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.frow input,.frow select,.frow textarea{width:100%}
+.dlgact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.dlgact .danger{color:var(--crit);margin-right:auto}
+
+/* ---------- toast ---------- */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:8px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:400}
+#toast.show{opacity:1}
+
+/* ---------- project mode ---------- */
+#project{position:fixed;inset:0;background:#0D1117;color:#E6EAF0;z-index:300;display:none;flex-direction:column;padding:2.2vw 2.6vw;overflow:hidden}
+#project.open{display:flex}
+#project .ptop{display:flex;align-items:baseline;gap:2vw;margin-bottom:1.6vw}
+#project .ptitle{font-size:clamp(20px,2.6vw,44px);font-weight:700}
+#project .pclock{font:700 clamp(22px,3vw,52px)/1 var(--f-mono);font-variant-numeric:tabular-nums;margin-left:auto;color:#98A3B3}
+#project .pdate{font-size:clamp(13px,1.3vw,22px);color:#98A3B3}
+#project .pbtns{position:absolute;bottom:14px;right:16px;display:flex;gap:8px;opacity:.35}
+#project .pbtns:hover{opacity:1}
+#project .pbtns button{padding:6px 14px;border-radius:7px;border:1px solid #3A4556;color:#E6EAF0;font-size:13px;font-weight:600}
+#pbody{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pchooser{margin:auto;display:grid;grid-template-columns:repeat(2,minmax(220px,320px));gap:18px}
+.pchooser button{padding:34px 20px;border:1.5px solid #3A4556;border-radius:14px;color:#E6EAF0;font-size:clamp(16px,1.6vw,26px);font-weight:700}
+.pchooser button:hover{background:#1A202A;border-color:#5E96E0}
+.pchooser .pc-sub{display:block;font-size:.6em;font-weight:500;color:#98A3B3;margin-top:6px}
+.pcols{display:grid;gap:1.2vw;flex:1;overflow:hidden}
+.pcol{background:#161C26;border-radius:12px;padding:1.1vw;overflow-y:auto}
+.pcol h3{margin:0 0 .8vw;font-size:clamp(13px,1.3vw,22px);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#98A3B3;display:flex;gap:.6vw;align-items:center}
+.pcol h3 .pcount{margin-left:auto;font-family:var(--f-mono);color:#5A6675}
+.pitem{background:#1E2633;border-radius:9px;padding:.9vw 1vw;margin-bottom:.7vw;font-size:clamp(14px,1.45vw,26px);font-weight:600;line-height:1.35}
+.pitem .pmeta{display:flex;gap:.7vw;margin-top:.4vw;font-size:.62em;font-weight:600;color:#98A3B3;flex-wrap:wrap;align-items:center}
+.pitem.pdone{opacity:.4;text-decoration:line-through}
+.pdot{display:inline-block;width:.55em;height:.55em;border-radius:50%}
+.pmit{border-left:.35vw solid #C08828}
+#project .pstu-tag{color:#5E96E0;border:1px dashed #5E96E0;border-radius:5px;padding:0 .5em;font-size:.62em}
+
+/* ---------- responsive ---------- */
+@media (max-width:900px){
+  .today-grid,.cols,.workgrid,.stu-grid,.learn-grid{grid-template-columns:1fr}
+  .workgrid{grid-template-columns:repeat(2,1fr)}
+  #app{grid-template-columns:1fr;grid-template-rows:58px 1fr 62px}
+  nav{grid-row:3;flex-direction:row;justify-content:space-around;border-right:none;border-top:1px solid var(--line);padding:6px 4px}
+  main{grid-row:2}
+  #clock{display:none}
+  .pchooser{grid-template-columns:1fr;width:80vw}
+}
+</style>
+
+<div id="app">
+<header>
+  <div class="logo">TriOS <span>· Life Command Centre</span></div>
+  <div id="clock">—</div>
+  <div id="capture"><input id="qcap" type="text" placeholder="Capture anything… (Enter → Brain Dump)" aria-label="Quick capture"></div>
+  <button class="hbtn primary" id="projectBtn">Project ▸</button>
+  <button class="hbtn" id="settingsBtn" aria-label="Settings">⚙</button>
+</header>
+
+<nav id="nav">
+  <button data-nav="today" class="active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>Today</button>
+  <button data-nav="dump"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Dump<span class="badge" id="inboxBadge" hidden></span></button>
+  <button data-nav="tasks"><svg viewBox="0 0 24 24"><path d="M4 6h6M4 12h6M4 18h6M14 6l2 2 4-4M14 13l2 2 4-4"/></svg>Tasks</button>
+  <button data-nav="work"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Work</button>
+  <button data-nav="learn"><svg viewBox="0 0 24 24"><path d="M12 4L2 9l10 5 10-5-10-5zM5 11v5c0 1.5 3 3 7 3s7-1.5 7-3v-5"/></svg>Learn</button>
+</nav>
+
+<main>
+
+<!-- ============ TODAY ============ -->
+<section data-view="today" class="active">
+  <h1 id="todayHead">Today</h1>
+  <p class="sub">Your peak window is <b id="peakLabel">6:00–14:00</b>. Deep work lives there; everything else waits.</p>
+  <div class="tiles" id="tiles"></div>
+  <div class="today-grid">
+    <div>
+      <div class="panel" style="margin-bottom:14px">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px"><h2>Today's 3</h2><span class="microlabel">most important tasks</span></div>
+        <div id="mitsToday"></div>
+      </div>
+      <div class="panel" style="margin-bottom:14px">
+        <h2>Energy map</h2>
+        <div class="strip" id="strip"></div>
+        <div class="lanes" id="lanesRow"></div>
+      </div>
+      <div class="panel">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px"><h2>Post-peak lane</h2><span class="microlabel">light tasks for after <span id="peakEndLabel">14:00</span></span></div>
+        <div id="afternoon"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:14px">
+        <h2 style="margin-bottom:8px">Energy check</h2>
+        <div id="energyCheck"></div>
+      </div>
+      <div class="panel">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px"><h2>Pick tomorrow's 3</h2><span class="microlabel" id="tomCount">0 / 3</span></div>
+        <div class="filters" id="pickFilters">
+          <button class="fbtn active" data-f="all">All</button>
+          <button class="fbtn" data-f="ats">ATS</button>
+          <button class="fbtn" data-f="promitor">Promitor</button>
+          <button class="fbtn" data-f="personal">Personal</button>
+        </div>
+        <div id="picker" style="max-height:420px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BRAIN DUMP ============ -->
+<section data-view="dump">
+  <h1>Brain Dump</h1>
+  <p class="sub">Get it out of your head first — one thought per line. Sort it after, or never. Nothing is ever rejected.</p>
+  <div class="panel dumpbox" style="margin-bottom:16px">
+    <textarea id="dumpText" placeholder="call accountant re BAS&#10;idea: template for Stu 1:1 agendas&#10;book dentist"></textarea>
+    <div style="display:flex;gap:8px;margin-top:9px;align-items:center">
+      <button class="filebtn" id="dumpAdd">Add to inbox</button>
+      <span class="microlabel">each line becomes one item</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px"><h2>Inbox</h2><span class="microlabel" id="inboxCount"></span></div>
+  <div id="inboxList"></div>
+</section>
+
+<!-- ============ TASKS ============ -->
+<section data-view="tasks">
+  <h1>Tasks</h1>
+  <p class="sub">Drag cards between areas to re-allocate. Star ★ sends a task to tomorrow's 3. <label style="margin-left:8px"><input type="checkbox" id="showDone"> show done</label></p>
+  <div class="cols" id="taskCols"></div>
+</section>
+
+<!-- ============ WORK ============ -->
+<section data-view="work">
+  <h1>Work — ATS</h1>
+  <p class="sub">Your ATS board plus everything involving Stu. This page is built to project on the office monitor.</p>
+  <div class="workgrid" id="workBoard"></div>
+  <div style="display:flex;align-items:baseline;gap:10px;margin:6px 0 2px"><h2>Stu</h2><span class="microlabel">director — raise it, wait on it, or it came from him</span></div>
+  <div class="stuadd"><input id="stuQuick" type="text" placeholder="To raise with Stu… (Enter)"><button class="filebtn" id="stuAddBtn">Add</button></div>
+  <div class="stu-grid" id="stuBoard"></div>
+</section>
+
+<!-- ============ LEARN ============ -->
+<section data-view="learn">
+  <h1>Learning Hub</h1>
+  <p class="sub">The pipeline for the learning platform you want to build — queue it, work it, finish it.</p>
+  <div class="addform panel">
+    <input type="text" id="learnTitle" placeholder="What do you want to learn?">
+    <select id="learnKind"><option value="course">Course</option><option value="book">Book</option><option value="article">Article</option><option value="video">Video</option><option value="skill">Skill</option></select>
+    <input type="text" class="lnk" id="learnLink" placeholder="Link (optional)">
+    <button class="filebtn" id="learnAdd">Queue it</button>
+  </div>
+  <div class="learn-grid" id="learnCols" style="margin-bottom:26px"></div>
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px"><h2>Ideas</h2><span class="microlabel">the parking lot — nothing here nags you</span></div>
+  <div class="stuadd"><input id="ideaQuick" type="text" placeholder="Park an idea… (Enter)"><button class="filebtn" id="ideaAddBtn">Park</button></div>
+  <div class="ideawall" id="ideaWall"></div>
+</section>
+
+</main>
+</div>
+
+<!-- ============ PROJECT OVERLAY ============ -->
+<div id="project">
+  <div class="ptop">
+    <div class="ptitle" id="pTitle">Project</div>
+    <div><div class="pclock" id="pClock">—</div><div class="pdate" id="pDate"></div></div>
+  </div>
+  <div id="pbody"></div>
+  <div class="pbtns"><button id="pChange">Change view</button><button id="pExit">Exit (Esc)</button></div>
+</div>
+
+<!-- ============ EDIT DIALOG ============ -->
+<dialog id="editDlg">
+  <h2 style="margin-bottom:14px">Edit task</h2>
+  <div class="frow"><label>Title</label><input id="eTitle" type="text"></div>
+  <div class="frow"><label>Area</label><select id="eDomain"><option value="ats">ATS</option><option value="promitor">Promitor</option><option value="personal">Personal</option></select></div>
+  <div class="frow"><label>Energy needed</label><select id="eEnergy"><option value="high">Deep focus</option><option value="med">Medium</option><option value="low">Light</option></select></div>
+  <div class="frow"><label>Due</label><input id="eDue" type="date"></div>
+  <div class="frow" id="eWorkRow"><label>ATS lane</label><select id="eWork"><option value="now">Now</option><option value="next">Next</option><option value="waiting">Waiting</option></select></div>
+  <div class="frow" id="eStuRow"><label>Stu</label><select id="eStu"><option value="">—</option><option value="raise">To raise with Stu</option><option value="waiting">Waiting on Stu</option><option value="assigned">Assigned by Stu</option></select></div>
+  <div class="frow"><label>Notes</label><textarea id="eNotes" rows="2"></textarea></div>
+  <div class="dlgact">
+    <button class="ghostbtn danger" id="eDelete">Delete</button>
+    <button class="ghostbtn" id="eCancel">Cancel</button>
+    <button class="filebtn" id="eSave">Save</button>
+  </div>
+</dialog>
+
+<!-- ============ SETTINGS DIALOG ============ -->
+<dialog id="setDlg">
+  <h2 style="margin-bottom:14px">Settings & data</h2>
+  <div class="frow"><label>Peak window (your sharp hours)</label>
+    <div style="display:flex;gap:8px;align-items:center"><input id="sPeakStart" type="number" min="0" max="23" style="width:80px"> to <input id="sPeakEnd" type="number" min="0" max="23" style="width:80px"></div></div>
+  <div class="frow"><label>ATS hours</label>
+    <div style="display:flex;gap:8px;align-items:center"><input id="sWorkStart" type="number" min="0" max="23" style="width:80px"> to <input id="sWorkEnd" type="number" min="0" max="23" style="width:80px"></div></div>
+  <p class="sub" style="margin:6px 0 12px">Data lives in this browser only (beta). Use export/import to move it between laptop and phone.</p>
+  <div class="dlgact" style="justify-content:flex-start;flex-wrap:wrap">
+    <button class="ghostbtn" id="sExport">Export JSON</button>
+    <button class="ghostbtn" id="sImport">Import JSON</button>
+    <input type="file" id="sImportFile" accept=".json" hidden>
+    <button class="ghostbtn danger" id="sWipe">Erase everything</button>
+    <button class="filebtn" id="sClose" style="margin-left:auto">Done</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ================= state ================= */
+const KEY="trios.v1", PKEY="trios.project";
+const uid=()=> (crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2));
+const fmt=d=>d.toLocaleDateString("en-CA");           // YYYY-MM-DD local
+const todayStr=()=>fmt(new Date());
+const tomorrowStr=()=>fmt(new Date(Date.now()+864e5));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const DOM_NAMES={ats:"ATS",promitor:"Promitor",personal:"Personal"};
+const ENERGY={high:["●●●","Deep"],med:["●●○","Medium"],low:["●○○","Light"]};
+
+let S=load();
+function seed(){
+  const t=(title,domain,energy,extra={})=>({id:uid(),title,domain,energy,status:"open",work:domain==="ats"?(extra.work||"next"):null,stu:extra.stu||null,mit:extra.mit||null,due:extra.due||null,notes:"",created:Date.now(),done_at:null});
+  return {
+    version:1,
+    settings:{peakStart:6,peakEnd:14,workStart:9,workEnd:17},
+    tasks:[
+      t("Reconcile FY25-26 expenses in Zoho Books","promitor","high"),
+      t("Gather EOFY docs for accountant — invoices, receipts, statements","promitor","med"),
+      t("Book tax-time session with accountant","promitor","low"),
+      t("Prepare weekly priorities summary for Stu","ats","med",{stu:"raise",work:"next"}),
+      t("Candidate pipeline review","ats","med",{work:"now"}),
+      t("Q1 contractor budget sign-off","ats","low",{stu:"waiting",work:"waiting"}),
+      t("Brain-dump every open loop into the TriOS inbox","personal","high"),
+      t("Triage 10 inbox items","personal","low")
+    ],
+    inbox:[
+      {id:uid(),text:"call accountant re BAS lodgement dates",created:Date.now()},
+      {id:uid(),text:"idea: standing agenda template for Stu 1:1s",created:Date.now()}
+    ],
+    ideas:[
+      {id:uid(),text:"TriOS v2 — sync tasks via the PKM vault backend (per build spec)",created:Date.now()},
+      {id:uid(),text:"Auto-classify Brain Dump inbox with Claude Haiku",created:Date.now()}
+    ],
+    learning:[
+      {id:uid(),title:"Pick the first course for the learning platform",kind:"skill",link:"",status:"queued",created:Date.now()}
+    ]
+  };
+}
+function load(){
+  try{const raw=localStorage.getItem(KEY); if(raw) return JSON.parse(raw);}catch(e){}
+  const s=seed(); localStorage.setItem(KEY,JSON.stringify(s)); return s;
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(S)); renderAll();}
+window.addEventListener("storage",e=>{ if(e.key===KEY&&e.newValue){S=JSON.parse(e.newValue); renderAll();} });
+
+/* ================= helpers ================= */
+function toast(msg){const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._h); toast._h=setTimeout(()=>t.classList.remove("show"),2200);}
+const byId=id=>S.tasks.find(t=>t.id===id);
+const open=()=>S.tasks.filter(t=>t.status==="open");
+const overdue=()=>open().filter(t=>t.due&&t.due<todayStr());
+function mits(date){return S.tasks.filter(t=>t.mit===date);}
+function toggleMit(id,date){
+  const t=byId(id); if(!t)return;
+  if(t.mit===date){t.mit=null;}
+  else{
+    if(mits(date).length>=3){toast("That day already has 3 — unstar one first");return;}
+    t.mit=date;
+  }
+  save();
+}
+function domChip(d){return `<span class="chip dom-${d}"><span class="dot ${d}"></span>${DOM_NAMES[d]}</span>`;}
+function energyChip(e){return `<span class="chip energy" title="${ENERGY[e][1]} focus">${ENERGY[e][0]} ${ENERGY[e][1]}</span>`;}
+function stuChip(s){const m={raise:"Raise with Stu",waiting:"Waiting on Stu",assigned:"From Stu"};return s?`<span class="chip stu">${m[s]}</span>`:"";}
+function dueChip(t){if(!t.due)return""; const od=t.due<todayStr()&&t.status==="open"; return `<span class="chip ${od?"crit":""}">${od?"overdue ":""}${t.due.slice(5)}</span>`;}
+function hhmm(h){return String(h).padStart(2,"0")+":00";}
+
+/* ================= clock ================= */
+function tickClock(){
+  const n=new Date();
+  const t=n.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+  const d=n.toLocaleDateString([], {weekday:"long",day:"numeric",month:"long"});
+  document.getElementById("clock").textContent=t+"  ·  "+d;
+  document.getElementById("pClock").textContent=t;
+  document.getElementById("pDate").textContent=d;
+  positionNowLine();
+}
+setInterval(tickClock,15000);
+
+/* ================= nav ================= */
+document.getElementById("nav").addEventListener("click",e=>{
+  const b=e.target.closest("[data-nav]"); if(!b)return;
+  document.querySelectorAll("#nav [data-nav]").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll("section[data-view]").forEach(s=>s.classList.toggle("active",s.dataset.view===b.dataset.nav));
+});
+
+/* ================= quick capture ================= */
+document.getElementById("qcap").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&e.target.value.trim()){
+    S.inbox.push({id:uid(),text:e.target.value.trim(),created:Date.now()});
+    e.target.value=""; save(); toast("Captured → Brain Dump");
+  }
+});
+
+/* ================= routing rules (local, zero-cost — mirrors rules.py) ================= */
+function suggest(text){
+  const s=text.toLowerCase();
+  let domain="personal";
+  if(/\b(stu|ats|candidate|recruit|client|placement)\b/.test(s)) domain="ats";
+  else if(/\b(promitor|invoice|tax|bas|gst|xero|zoho|accountant|eofy|billing)\b/.test(s)) domain="promitor";
+  let type="task";
+  if(/\b(learn|course|read|study|watch|tutorial|research)\b/.test(s)) type="learning";
+  else if(/^idea[:\s]|(^|\s)(what if|maybe|someday|could we)\b/.test(s)) type="idea";
+  return {domain,type};
+}
+
+/* ================= renders ================= */
+function renderAll(){
+  renderBadges(); renderTiles(); renderMitsToday(); renderStrip(); renderEnergyCheck();
+  renderAfternoon(); renderPicker(); renderInbox(); renderTasks(); renderWork(); renderLearn(); renderIdeas();
+  renderProject();
+  document.getElementById("peakLabel").textContent=hhmm(S.settings.peakStart)+"–"+hhmm(S.settings.peakEnd);
+  document.getElementById("peakEndLabel").textContent=hhmm(S.settings.peakEnd);
+  document.getElementById("todayHead").textContent=new Date().toLocaleDateString([],{weekday:"long",day:"numeric",month:"long"});
+}
+function renderBadges(){
+  const b=document.getElementById("inboxBadge");
+  b.hidden=!S.inbox.length; b.textContent=S.inbox.length;
+}
+function renderTiles(){
+  const per=d=>open().filter(t=>t.domain===d).length;
+  document.getElementById("tiles").innerHTML=`
+    <div class="tile"><div class="microlabel">Inbox</div><div class="num">${S.inbox.length}</div></div>
+    <div class="tile"><div class="microlabel"><span class="dot ats"></span>ATS open</div><div class="num">${per("ats")}</div></div>
+    <div class="tile"><div class="microlabel"><span class="dot promitor"></span>Promitor open</div><div class="num">${per("promitor")}</div></div>
+    <div class="tile"><div class="microlabel"><span class="dot personal"></span>Personal open</div><div class="num">${per("personal")}</div></div>
+    <div class="tile"><div class="microlabel">Ideas parked</div><div class="num">${S.ideas.length}</div></div>
+    <div class="tile"><div class="microlabel">Learning active</div><div class="num">${S.learning.filter(l=>l.status==="active").length}</div></div>`;
+}
+function renderMitsToday(){
+  const el=document.getElementById("mitsToday");
+  const list=mits(todayStr());
+  if(!list.length){el.innerHTML=`<div class="empty">No Top 3 set for today. Star tasks in “Pick tomorrow's 3” each evening — they land here next morning. (You can also star for today in a pinch: tap ★ then edit the date below.)</div>`;return;}
+  el.innerHTML=list.map((t,i)=>`
+    <div class="mitcard ${t.status==="done"?"done tcard":""}" >
+      <div class="n">${i+1}</div>
+      <button class="chk ${t.status==="done"?"on":""}" data-act="done" data-id="${t.id}" aria-label="mark done">✓</button>
+      <div class="tbody"><div class="ttl">${esc(t.title)}</div>
+        <div class="chips">${domChip(t.domain)}${energyChip(t.energy)}${stuChip(t.stu)}${dueChip(t)}</div></div>
+      <div class="tact"><button data-act="unmit" data-id="${t.id}" title="remove from today">✕</button></div>
+    </div>`).join("");
+}
+function renderStrip(){
+  const st=S.settings, el=document.getElementById("strip");
+  const H0=5,H1=21,span=H1-H0, pct=h=>((h-H0)/span*100).toFixed(2)+"%";
+  const ticks=[6,9,12,14,17,20].map(h=>`<div class="tick" style="left:${pct(h)}">${h}</div>`).join("");
+  el.innerHTML=`
+    <div class="zone peak" style="left:${pct(st.peakStart)};width:${((st.peakEnd-st.peakStart)/span*100).toFixed(2)}%"></div>
+    <div class="zone ats-band" style="left:${pct(st.workStart)};width:${((st.workEnd-st.workStart)/span*100).toFixed(2)}%"></div>
+    <div class="zlabel peak-l" style="left:calc(${pct(st.peakStart)} + 8px)">Peak</div>
+    <div class="zlabel ats-l" style="left:calc(${pct(st.workStart)} + 8px);top:22px">ATS ${st.workStart}–${st.workEnd}</div>
+    <div class="nowline" id="nowline"></div>${ticks}`;
+  positionNowLine();
+  const lanes=[
+    [`<b>${hhmm(S.settings.peakStart)}–${hhmm(S.settings.workStart)}</b> your deep work — Promitor & Personal`],
+    [`<b>${hhmm(S.settings.workStart)}–${hhmm(S.settings.peakEnd)}</b> ATS deep work`],
+    [`<b>after ${hhmm(S.settings.peakEnd)}</b> light: admin, meetings, email`]
+  ];
+  document.getElementById("lanesRow").innerHTML=lanes.map(l=>`<span class="lane">${l}</span>`).join("");
+}
+function positionNowLine(){
+  const el=document.getElementById("nowline"); if(!el)return;
+  const n=new Date(); const h=n.getHours()+n.getMinutes()/60;
+  if(h<5||h>21){el.style.display="none";return;}
+  el.style.display="block"; el.style.left=((h-5)/16*100).toFixed(2)+"%";
+}
+function renderEnergyCheck(){
+  const el=document.getElementById("energyCheck"); const st=S.settings;
+  const msgs=[]; const push=(sig,html)=>msgs.push(`<div class="checkmsg"><span class="sig ${sig}"></span><div>${html}</div></div>`);
+  const tToday=mits(todayStr()).filter(t=>t.status==="open");
+  const tTom=mits(tomorrowStr());
+  const highToday=tToday.filter(t=>t.energy==="high");
+  if(highToday.length>=3) push("warn",`All three of today's tasks need deep focus. One peak window rarely fits three deep blocks — consider demoting one to tomorrow.`);
+  highToday.forEach(t=>{
+    if(t.domain==="ats") push("info",`<b>${esc(t.title)}</b> → deep ATS work: aim for <b>${hhmm(st.workStart)}–${hhmm(st.peakEnd)}</b>.`);
+    else push("info",`<b>${esc(t.title)}</b> → this is yours, not ATS's: protect <b>${hhmm(st.peakStart)}–${hhmm(st.workStart)}</b> before work hours.`);
+  });
+  tToday.filter(t=>t.energy==="low").forEach(t=>push("ok",`<b>${esc(t.title)}</b> is light — park it after ${hhmm(st.peakEnd)}, don't spend peak hours on it.`));
+  const od=overdue().length;
+  if(od) push("crit",`<b>${od}</b> task${od>1?"s":""} overdue — reschedule or kill them; a stale list stops being trusted.`);
+  if(!tTom.length) push("info",`Tomorrow's 3 not picked yet. Best done tonight — future-you shouldn't decide at 6am.`);
+  else if(tTom.filter(t=>t.energy==="high").length>2) push("warn",`Tomorrow has ${tTom.filter(t=>t.energy==="high").length} deep-focus tasks starred. Realistic for one peak window?`);
+  else push("ok",`Tomorrow's plan fits your energy: ${tTom.length} starred, ${tTom.filter(t=>t.energy==="high").length} deep.`);
+  if(!msgs.length) push("ok","Nothing to flag.");
+  el.innerHTML=msgs.join("");
+}
+function renderAfternoon(){
+  const picks=open().filter(t=>t.energy!=="high"&&t.mit!==todayStr()).slice(0,3);
+  document.getElementById("afternoon").innerHTML=picks.length?picks.map(t=>`
+    <div class="tcard">
+      <button class="chk" data-act="done" data-id="${t.id}">✓</button>
+      <div class="tbody"><div class="ttl">${esc(t.title)}</div><div class="chips">${domChip(t.domain)}${energyChip(t.energy)}</div></div>
+    </div>`).join(""):`<div class="empty">No light tasks queued — that's either great or suspicious.</div>`;
+}
+let pickFilter="all";
+document.getElementById("pickFilters").addEventListener("click",e=>{
+  const b=e.target.closest(".fbtn"); if(!b)return;
+  pickFilter=b.dataset.f;
+  document.querySelectorAll("#pickFilters .fbtn").forEach(x=>x.classList.toggle("active",x===b));
+  renderPicker();
+});
+function renderPicker(){
+  const tom=tomorrowStr();
+  const list=open().filter(t=>pickFilter==="all"||t.domain===pickFilter);
+  document.getElementById("tomCount").textContent=`${mits(tom).length} / 3 · for ${tom.slice(5)}`;
+  document.getElementById("picker").innerHTML=list.length?list.map(t=>`
+    <div class="pickrow">
+      <button class="starbtn ${t.mit===tom?"on":""}" data-act="star" data-id="${t.id}" aria-label="star for tomorrow">★</button>
+      <div class="ttl">${esc(t.title)}</div>
+      ${domChip(t.domain)}${energyChip(t.energy)}
+    </div>`).join(""):`<div class="empty">No open tasks here. Brain Dump feeds this list.</div>`;
+}
+
+/* ---------- brain dump ---------- */
+document.getElementById("dumpAdd").addEventListener("click",()=>{
+  const ta=document.getElementById("dumpText");
+  const lines=ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!lines.length)return;
+  lines.forEach(text=>S.inbox.push({id:uid(),text,created:Date.now()}));
+  ta.value=""; save(); toast(lines.length+" captured");
+});
+function renderInbox(){
+  document.getElementById("inboxCount").textContent=S.inbox.length+" to sort — no rush, no guilt";
+  const el=document.getElementById("inboxList");
+  if(!S.inbox.length){el.innerHTML=`<div class="empty">Inbox zero. Head's empty (in the good way).</div>`;return;}
+  el.innerHTML=S.inbox.map(it=>{
+    const sg=suggest(it.text);
+    return `<div class="triage" data-iid="${it.id}" data-domain="${sg.domain}" data-type="${sg.type}" data-energy="med">
+      <div class="txt">${esc(it.text)}</div>
+      <div class="optrow"><span class="microlabel">Area</span>
+        ${["ats","promitor","personal"].map(d=>`<button class="opt o-${d} ${sg.domain===d?"sel":""}" data-set="domain" data-val="${d}">${DOM_NAMES[d]}</button>`).join("")}</div>
+      <div class="optrow"><span class="microlabel">Type</span>
+        ${[["task","Task"],["idea","Idea"],["learning","Learning"]].map(([v,l])=>`<button class="opt ${sg.type===v?"sel":""}" data-set="type" data-val="${v}">${l}</button>`).join("")}</div>
+      <div class="optrow" data-only="task" ${sg.type!=="task"?"hidden":""}><span class="microlabel">Energy</span>
+        ${[["high","●●● Deep"],["med","●●○ Medium"],["low","●○○ Light"]].map(([v,l])=>`<button class="opt ${v==="med"?"sel":""}" data-set="energy" data-val="${v}">${l}</button>`).join("")}</div>
+      <div class="act"><button class="filebtn" data-act="file">File it</button><button class="ghostbtn" data-act="trash">Delete</button></div>
+    </div>`;}).join("");
+}
+document.getElementById("inboxList").addEventListener("click",e=>{
+  const card=e.target.closest(".triage"); if(!card)return;
+  const setBtn=e.target.closest("[data-set]");
+  if(setBtn){
+    const k=setBtn.dataset.set; card.dataset[k]=setBtn.dataset.val;
+    card.querySelectorAll(`[data-set="${k}"]`).forEach(b=>b.classList.toggle("sel",b===setBtn));
+    const er=card.querySelector('[data-only="task"]'); if(k==="type") er.hidden=card.dataset.type!=="task";
+    return;
+  }
+  const act=e.target.closest("[data-act]"); if(!act)return;
+  const idx=S.inbox.findIndex(x=>x.id===card.dataset.iid); if(idx<0)return;
+  const item=S.inbox[idx];
+  if(act.dataset.act==="trash"){S.inbox.splice(idx,1); save(); return;}
+  const {domain,type,energy}=card.dataset;
+  if(type==="task"){
+    S.tasks.push({id:uid(),title:item.text,domain,energy,status:"open",work:domain==="ats"?"next":null,stu:null,mit:null,due:null,notes:"",created:Date.now(),done_at:null});
+    toast("Task filed → "+DOM_NAMES[domain]);
+  }else if(type==="idea"){
+    S.ideas.push({id:uid(),text:item.text,created:Date.now()}); toast("Parked in Ideas");
+  }else{
+    S.learning.push({id:uid(),title:item.text,kind:"skill",link:"",status:"queued",created:Date.now()}); toast("Queued in Learning Hub");
+  }
+  S.inbox.splice(idx,1); save();
+});
+
+/* ---------- tasks view ---------- */
+function taskCardHTML(t){
+  const tom=tomorrowStr();
+  return `<div class="tcard ${t.status==="done"?"done":""}" draggable="true" data-tid="${t.id}">
+    <button class="chk ${t.status==="done"?"on":""}" data-act="done" data-id="${t.id}" aria-label="toggle done">✓</button>
+    <div class="tbody"><div class="ttl">${esc(t.title)}</div>
+      <div class="chips">${energyChip(t.energy)}${stuChip(t.stu)}${dueChip(t)}${t.mit===todayStr()?'<span class="chip warn">★ today</span>':""}${t.mit===tom?'<span class="chip warn">★ tomorrow</span>':""}</div></div>
+    <div class="tact">
+      <button class="star ${t.mit===tom?"on":""}" data-act="star" data-id="${t.id}" title="star for tomorrow">★</button>
+      <button data-act="edit" data-id="${t.id}" title="edit">✎</button>
+      <button data-act="del" data-id="${t.id}" title="delete">✕</button>
+    </div></div>`;
+}
+function renderTasks(){
+  const showDone=document.getElementById("showDone").checked;
+  document.getElementById("taskCols").innerHTML=["ats","promitor","personal"].map(d=>{
+    const list=S.tasks.filter(t=>t.domain===d&&(showDone||t.status==="open"));
+    return `<div class="col" data-drop-domain="${d}">
+      <div class="colhead"><span class="dot ${d}"></span><h2>${DOM_NAMES[d]}</h2><span class="count">${list.filter(t=>t.status==="open").length} open</span></div>
+      <div class="coladd"><input type="text" placeholder="Add to ${DOM_NAMES[d]}…" data-add-domain="${d}"><button data-addbtn="${d}">+</button></div>
+      ${list.map(taskCardHTML).join("")||'<div class="empty">Nothing here</div>'}
+    </div>`;}).join("");
+}
+document.getElementById("showDone").addEventListener("change",renderTasks);
+
+/* task actions (delegated across whole main) */
+document.querySelector("main").addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return;
+  const id=b.dataset.id, t=id?byId(id):null;
+  switch(b.dataset.act){
+    case "done": if(t){t.status=t.status==="open"?"done":"open"; t.done_at=t.status==="done"?Date.now():null; save();} break;
+    case "star": if(t) toggleMit(id,tomorrowStr()); break;
+    case "unmit": if(t){t.mit=null; save();} break;
+    case "del": if(t){S.tasks=S.tasks.filter(x=>x.id!==id); save();} break;
+    case "edit": if(t) openEdit(t); break;
+  }
+});
+/* add-task inputs */
+document.querySelector("main").addEventListener("keydown",e=>{
+  const inp=e.target.closest("[data-add-domain]");
+  if(inp&&e.key==="Enter"&&inp.value.trim()){addQuickTask(inp.dataset.addDomain,inp.value.trim()); inp.value="";}
+});
+document.querySelector("main").addEventListener("click",e=>{
+  const btn=e.target.closest("[data-addbtn]"); if(!btn)return;
+  const inp=document.querySelector(`[data-add-domain="${btn.dataset.addbtn}"]`);
+  if(inp&&inp.value.trim()){addQuickTask(btn.dataset.addbtn,inp.value.trim()); inp.value="";}
+});
+function addQuickTask(domain,title,extra={}){
+  S.tasks.push({id:uid(),title,domain,energy:extra.energy||"med",status:"open",work:domain==="ats"?(extra.work||"next"):null,stu:extra.stu||null,mit:null,due:null,notes:"",created:Date.now(),done_at:null});
+  save();
+}
+
+/* drag & drop */
+let dragId=null;
+document.addEventListener("dragstart",e=>{
+  const c=e.target.closest("[data-tid]"); if(!c)return;
+  dragId=c.dataset.tid; c.classList.add("dragging");
+  e.dataTransfer.effectAllowed="move";
+});
+document.addEventListener("dragend",e=>{const c=e.target.closest("[data-tid]"); if(c)c.classList.remove("dragging"); dragId=null;
+  document.querySelectorAll(".dropping").forEach(x=>x.classList.remove("dropping"));});
+document.addEventListener("dragover",e=>{
+  const z=e.target.closest("[data-drop-domain],[data-drop-lane]");
+  if(z){e.preventDefault(); z.classList.add("dropping");}
+});
+document.addEventListener("dragleave",e=>{
+  const z=e.target.closest("[data-drop-domain],[data-drop-lane]"); if(z)z.classList.remove("dropping");
+});
+document.addEventListener("drop",e=>{
+  const z=e.target.closest("[data-drop-domain],[data-drop-lane]"); if(!z||!dragId)return;
+  e.preventDefault(); const t=byId(dragId); if(!t)return;
+  if(z.dataset.dropDomain){
+    t.domain=z.dataset.dropDomain;
+    if(t.domain!=="ats"){t.work=null;t.stu=null;} else if(!t.work){t.work="next";}
+  }
+  if(z.dataset.dropLane){t.work=z.dataset.dropLane; t.domain="ats";}
+  z.classList.remove("dropping"); save();
+});
+
+/* ---------- work board ---------- */
+function renderWork(){
+  const lanes=[["now","Now"],["next","Next"],["waiting","Waiting"],["done","Done today"]];
+  const today=todayStr();
+  document.getElementById("workBoard").innerHTML=lanes.map(([k,label])=>{
+    const list=k==="done"
+      ? S.tasks.filter(t=>t.domain==="ats"&&t.status==="done"&&t.done_at&&fmt(new Date(t.done_at))===today)
+      : S.tasks.filter(t=>t.domain==="ats"&&t.status==="open"&&(t.work||"next")===k);
+    return `<div class="col" ${k!=="done"?`data-drop-lane="${k}"`:""}>
+      <div class="colhead"><h2>${label}</h2><span class="count">${list.length}</span></div>
+      ${list.map(taskCardHTML).join("")||'<div class="empty">—</div>'}</div>`;
+  }).join("");
+  const groups=[["raise","To raise with Stu"],["waiting","Waiting on Stu"],["assigned","Assigned by Stu"]];
+  document.getElementById("stuBoard").innerHTML=groups.map(([k,label])=>{
+    const list=S.tasks.filter(t=>t.domain==="ats"&&t.status==="open"&&t.stu===k);
+    return `<div class="col"><div class="colhead"><h2>${label}</h2><span class="count">${list.length}</span></div>
+      ${list.map(taskCardHTML).join("")||'<div class="empty">—</div>'}</div>`;
+  }).join("");
+}
+function stuQuickAdd(){
+  const inp=document.getElementById("stuQuick");
+  if(inp.value.trim()){addQuickTask("ats",inp.value.trim(),{stu:"raise"}); inp.value=""; toast("Added to raise with Stu");}
+}
+document.getElementById("stuAddBtn").addEventListener("click",stuQuickAdd);
+document.getElementById("stuQuick").addEventListener("keydown",e=>{if(e.key==="Enter")stuQuickAdd();});
+
+/* ---------- learning + ideas ---------- */
+document.getElementById("learnAdd").addEventListener("click",()=>{
+  const t=document.getElementById("learnTitle"), l=document.getElementById("learnLink"), k=document.getElementById("learnKind");
+  if(!t.value.trim())return;
+  S.learning.push({id:uid(),title:t.value.trim(),kind:k.value,link:l.value.trim(),status:"queued",created:Date.now()});
+  t.value="";l.value=""; save(); toast("Queued");
+});
+function renderLearn(){
+  const cols=[["queued","Queued"],["active","In progress"],["done","Done"]];
+  document.getElementById("learnCols").innerHTML=cols.map(([k,label])=>{
+    const list=S.learning.filter(x=>x.status===k);
+    return `<div class="col"><div class="colhead"><h2>${label}</h2><span class="count">${list.length}</span></div>
+      ${list.map(x=>`<div class="lcard" data-lid="${x.id}">
+        <div class="kind">${x.kind}</div><div class="ttl">${esc(x.title)}</div>
+        ${x.link?`<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.link)}</a>`:""}
+        <div class="lmove">
+          ${k!=="queued"?'<button data-lmove="back">◀ back</button>':""}
+          ${k!=="done"?'<button data-lmove="fwd">'+(k==="queued"?"start ▶":"finish ✓")+"</button>":""}
+          <button data-lmove="del">✕</button>
+        </div></div>`).join("")||'<div class="empty">—</div>'}</div>`;
+  }).join("");
+}
+document.getElementById("learnCols").addEventListener("click",e=>{
+  const b=e.target.closest("[data-lmove]"); if(!b)return;
+  const card=e.target.closest("[data-lid]"); const it=S.learning.find(x=>x.id===card.dataset.lid); if(!it)return;
+  const order=["queued","active","done"], i=order.indexOf(it.status);
+  if(b.dataset.lmove==="fwd") it.status=order[Math.min(i+1,2)];
+  else if(b.dataset.lmove==="back") it.status=order[Math.max(i-1,0)];
+  else S.learning=S.learning.filter(x=>x.id!==it.id);
+  save();
+});
+function ideaQuickAdd(){
+  const inp=document.getElementById("ideaQuick");
+  if(inp.value.trim()){S.ideas.push({id:uid(),text:inp.value.trim(),created:Date.now()}); inp.value=""; save(); toast("Parked");}
+}
+document.getElementById("ideaAddBtn").addEventListener("click",ideaQuickAdd);
+document.getElementById("ideaQuick").addEventListener("keydown",e=>{if(e.key==="Enter")ideaQuickAdd();});
+function renderIdeas(){
+  document.getElementById("ideaWall").innerHTML=S.ideas.map(x=>`
+    <div class="idea" data-iid="${x.id}">
+      <div class="txt">${esc(x.text)}</div>
+      <div class="act">
+        <button data-ipromote="ats">→ ATS task</button>
+        <button data-ipromote="promitor">→ Promitor</button>
+        <button data-ipromote="personal">→ Personal</button>
+        <button data-idel>✕</button>
+      </div></div>`).join("")||'<div class="empty" style="grid-column:1/-1">No ideas parked. When one strikes mid-task, park it here and stay on course.</div>';
+}
+document.getElementById("ideaWall").addEventListener("click",e=>{
+  const card=e.target.closest("[data-iid]"); if(!card)return;
+  const it=S.ideas.find(x=>x.id===card.dataset.iid); if(!it)return;
+  const p=e.target.closest("[data-ipromote]");
+  if(p){addQuickTask(p.dataset.ipromote,it.text); S.ideas=S.ideas.filter(x=>x.id!==it.id); save(); toast("Task created in "+DOM_NAMES[p.dataset.ipromote]); return;}
+  if(e.target.closest("[data-idel]")){S.ideas=S.ideas.filter(x=>x.id!==it.id); save();}
+});
+
+/* ---------- edit dialog ---------- */
+const editDlg=document.getElementById("editDlg"); let editId=null;
+function openEdit(t){
+  editId=t.id;
+  document.getElementById("eTitle").value=t.title;
+  document.getElementById("eDomain").value=t.domain;
+  document.getElementById("eEnergy").value=t.energy;
+  document.getElementById("eDue").value=t.due||"";
+  document.getElementById("eWork").value=t.work||"next";
+  document.getElementById("eStu").value=t.stu||"";
+  document.getElementById("eNotes").value=t.notes||"";
+  syncAtsRows(); editDlg.showModal();
+}
+function syncAtsRows(){
+  const isAts=document.getElementById("eDomain").value==="ats";
+  document.getElementById("eWorkRow").hidden=!isAts;
+  document.getElementById("eStuRow").hidden=!isAts;
+}
+document.getElementById("eDomain").addEventListener("change",syncAtsRows);
+document.getElementById("eSave").addEventListener("click",()=>{
+  const t=byId(editId); if(!t){editDlg.close();return;}
+  t.title=document.getElementById("eTitle").value.trim()||t.title;
+  t.domain=document.getElementById("eDomain").value;
+  t.energy=document.getElementById("eEnergy").value;
+  t.due=document.getElementById("eDue").value||null;
+  if(t.domain==="ats"){t.work=document.getElementById("eWork").value; t.stu=document.getElementById("eStu").value||null;}
+  else{t.work=null;t.stu=null;}
+  t.notes=document.getElementById("eNotes").value;
+  editDlg.close(); save();
+});
+document.getElementById("eCancel").addEventListener("click",()=>editDlg.close());
+document.getElementById("eDelete").addEventListener("click",()=>{S.tasks=S.tasks.filter(x=>x.id!==editId); editDlg.close(); save();});
+
+/* ---------- settings ---------- */
+const setDlg=document.getElementById("setDlg");
+document.getElementById("settingsBtn").addEventListener("click",()=>{
+  document.getElementById("sPeakStart").value=S.settings.peakStart;
+  document.getElementById("sPeakEnd").value=S.settings.peakEnd;
+  document.getElementById("sWorkStart").value=S.settings.workStart;
+  document.getElementById("sWorkEnd").value=S.settings.workEnd;
+  setDlg.showModal();
+});
+document.getElementById("sClose").addEventListener("click",()=>{
+  S.settings.peakStart=+document.getElementById("sPeakStart").value||6;
+  S.settings.peakEnd=+document.getElementById("sPeakEnd").value||14;
+  S.settings.workStart=+document.getElementById("sWorkStart").value||9;
+  S.settings.workEnd=+document.getElementById("sWorkEnd").value||17;
+  setDlg.close(); save();
+});
+document.getElementById("sExport").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="trios-backup-"+todayStr()+".json"; a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById("sImport").addEventListener("click",()=>document.getElementById("sImportFile").click());
+document.getElementById("sImportFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result); if(d&&d.tasks&&d.settings){S=d; save(); toast("Imported");}else toast("That file doesn't look like a TriOS backup");}catch(err){toast("Couldn't read that file");}};
+  r.readAsText(f); e.target.value="";
+});
+document.getElementById("sWipe").addEventListener("click",()=>{
+  if(confirm("Erase all TriOS data in this browser? Export first if unsure.")){localStorage.removeItem(KEY); S=load(); save(); setDlg.close();}
+});
+
+/* ---------- project mode ---------- */
+const proj=document.getElementById("project");
+let pView=null;
+document.getElementById("projectBtn").addEventListener("click",()=>{pView=localStorage.getItem(PKEY)||null; openProject(pView);});
+document.getElementById("pExit").addEventListener("click",closeProject);
+document.getElementById("pChange").addEventListener("click",()=>{pView=null;localStorage.removeItem(PKEY);renderProject();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&proj.classList.contains("open"))closeProject();});
+function openProject(v){pView=v;proj.classList.add("open");renderProject();}
+function closeProject(){proj.classList.remove("open");}
+const P_TITLES={work:"ATS · Work Board",today3:"Today's 3",ideas:"Ideas Wall",learn:"Learning Hub"};
+function renderProject(){
+  if(!proj.classList.contains("open"))return;
+  const body=document.getElementById("pbody");
+  if(!pView){
+    document.getElementById("pTitle").textContent="Project a board";
+    body.innerHTML=`<div class="pchooser">
+      <button data-pv="work">Work board<span class="pc-sub">ATS lanes + Stu — for the office monitor</span></button>
+      <button data-pv="today3">Today's 3<span class="pc-sub">MITs, huge</span></button>
+      <button data-pv="ideas">Ideas wall<span class="pc-sub">the parking lot</span></button>
+      <button data-pv="learn">Learning hub<span class="pc-sub">the pipeline</span></button>
+    </div>`;
+    return;
+  }
+  document.getElementById("pTitle").textContent=P_TITLES[pView]||"";
+  const pdot=d=>`<span class="pdot" style="background:${{ats:"#5E96E0",promitor:"#C670C2",personal:"#3FAE5E"}[d]}"></span>`;
+  const item=(t,extra="")=>`<div class="pitem ${t.status==="done"?"pdone":""} ${t.mit===todayStr()?"pmit":""}">${esc(t.title)}
+     <div class="pmeta">${pdot(t.domain)} ${DOM_NAMES[t.domain]} · ${ENERGY[t.energy][0]} ${t.stu?`<span class="pstu-tag">${({raise:"raise",waiting:"waiting on",assigned:"from"})[t.stu]} Stu</span>`:""} ${extra}</div></div>`;
+  if(pView==="work"){
+    const lane=(k,label,list)=>`<div class="pcol"><h3>${label}<span class="pcount">${list.length}</span></h3>${list.map(t=>item(t)).join("")||""}</div>`;
+    const ats=k=>S.tasks.filter(t=>t.domain==="ats"&&t.status==="open"&&(t.work||"next")===k);
+    const doneToday=S.tasks.filter(t=>t.domain==="ats"&&t.status==="done"&&t.done_at&&fmt(new Date(t.done_at))===todayStr());
+    const stu=k=>S.tasks.filter(t=>t.domain==="ats"&&t.status==="open"&&t.stu===k);
+    body.innerHTML=`<div class="pcols" style="grid-template-columns:repeat(4,1fr);flex:1.4">
+        ${lane("now","Now",ats("now"))}${lane("next","Next",ats("next"))}${lane("waiting","Waiting",ats("waiting"))}${lane("done","Done today",doneToday)}</div>
+      <div class="pcols" style="grid-template-columns:repeat(3,1fr);flex:1;margin-top:1.2vw">
+        ${lane("r","Raise with Stu",stu("raise"))}${lane("w","Waiting on Stu",stu("waiting"))}${lane("a","From Stu",stu("assigned"))}</div>`;
+  }else if(pView==="today3"){
+    const list=mits(todayStr());
+    body.innerHTML=`<div class="pcols" style="grid-template-columns:1fr">
+      <div class="pcol">${list.map((t,i)=>item(t,`&nbsp; #${i+1}`)).join("")||'<div class="pitem">No Top 3 set — star tasks on the laptop.</div>'}</div></div>`;
+  }else if(pView==="ideas"){
+    body.innerHTML=`<div class="pcols" style="grid-template-columns:repeat(auto-fill,minmax(24vw,1fr));align-content:start">
+      ${S.ideas.map(x=>`<div class="pitem">${esc(x.text)}</div>`).join("")||'<div class="pitem">Nothing parked.</div>'}</div>`;
+  }else if(pView==="learn"){
+    const col=(k,label)=>{const list=S.learning.filter(x=>x.status===k);
+      return `<div class="pcol"><h3>${label}<span class="pcount">${list.length}</span></h3>${list.map(x=>`<div class="pitem">${esc(x.title)}<div class="pmeta">${x.kind}</div></div>`).join("")}</div>`;};
+    body.innerHTML=`<div class="pcols" style="grid-template-columns:repeat(3,1fr)">${col("queued","Queued")}${col("active","In progress")}${col("done","Done")}</div>`;
+  }
+}
+document.getElementById("pbody").addEventListener("click",e=>{
+  const b=e.target.closest("[data-pv]"); if(!b)return;
+  pView=b.dataset.pv; localStorage.setItem(PKEY,pView); renderProject();
+});
+/* auto-open from URL hash, e.g. …#project=work on the TV browser */
+if(location.hash.startsWith("#project=")){
+  const v=location.hash.split("=")[1];
+  if(P_TITLES[v]){openProject(v); localStorage.setItem(PKEY,v);}
+}
+
+/* ================= go ================= */
+tickClock(); renderAll();
+</script>
