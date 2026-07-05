@@ -337,6 +337,27 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .pmit{border-left:.35vw solid #C08828}
 #project .pstu-tag{color:#5E96E0;border:1px dashed #5E96E0;border-radius:5px;padding:0 .5em;font-size:.62em}
 
+/* ---------- skins: console (A) · classic · daybook (B) ---------- */
+:root[data-skin="console"] body{font-size:13.5px}
+:root[data-skin="console"] main{padding:14px 16px 50px}
+:root[data-skin="console"] .panel{padding:12px 14px;border-radius:8px}
+:root[data-skin="console"] h1{font:700 15px var(--f-mono);letter-spacing:.09em;text-transform:uppercase}
+:root[data-skin="console"] h2{font:700 11.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+:root[data-skin="console"] .sub{font-size:12px;margin-bottom:12px}
+:root[data-skin="console"] .tile{padding:8px 12px;border-radius:8px}
+:root[data-skin="console"] .tile .num{font-size:21px}
+:root[data-skin="console"] .tiles{gap:8px;margin-bottom:12px}
+:root[data-skin="console"] .today-grid{gap:12px}
+:root[data-skin="console"] .mitcard{padding:8px 11px;border-radius:6px}
+:root[data-skin="console"] .tcard{padding:7px 8px;border-radius:6px}
+:root[data-skin="console"] .col{border-radius:8px;padding:9px}
+:root[data-skin="daybook"] h1{font:600 27px "Iowan Old Style","Palatino Linotype",Georgia,serif;letter-spacing:0;text-transform:none}
+:root[data-skin="daybook"] h2{font-size:16px}
+:root[data-skin="daybook"] main{padding:28px 26px 70px}
+:root[data-skin="daybook"] .panel{border-radius:14px;padding:20px}
+:root[data-skin="daybook"] .mitcard{padding:14px 15px;border-radius:10px}
+:root[data-skin="daybook"] .tile{border-radius:12px;padding:14px 16px}
+
 /* ---------- responsive ---------- */
 @media (max-width:900px){
   .today-grid,.cols,.workgrid,.stu-grid,.learn-grid,.sysgrid{grid-template-columns:1fr}
@@ -379,7 +400,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 
 <!-- ============ HOME ============ -->
 <section data-view="today" class="active">
-  <div style="display:flex;align-items:baseline;gap:12px"><h1 id="todayHead">Today</h1><button class="ghostbtn" id="reviewBtn" style="margin-left:auto">Weekly review</button></div>
+  <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h1 id="todayHead">Today</h1><button class="ghostbtn" id="skinBtn" style="margin-left:auto">Style: Console</button><button class="ghostbtn" id="reviewBtn">Weekly review</button></div>
   <p class="sub">Your Top 3, your day on a timeline, and nothing that can wait.</p>
   <div id="firstRun" hidden>
     <b>Welcome to TriOS synced.</b> This account is empty — how do you want to start?
@@ -1862,6 +1883,22 @@ if(location.protocol.startsWith("http")&&"serviceWorker" in navigator){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 setInterval(notifTick,60000);
+
+/* ---------- skin switcher (per device) ---------- */
+const SKINS=["console","classic","daybook"];
+function applySkin(s){
+  const r=document.documentElement;
+  if(s==="classic"){delete r.dataset.skin; r.removeAttribute("data-theme");}
+  else{r.dataset.skin=s; r.setAttribute("data-theme",s==="console"?"dark":"light");}
+  localStorage.setItem("trios.skin",s);
+  const b=document.getElementById("skinBtn");
+  if(b) b.textContent="Style: "+s.charAt(0).toUpperCase()+s.slice(1);
+}
+document.getElementById("skinBtn").addEventListener("click",()=>{
+  const cur=localStorage.getItem("trios.skin")||"console";
+  applySkin(SKINS[(SKINS.indexOf(cur)+1)%SKINS.length]);
+});
+applySkin(localStorage.getItem("trios.skin")||"console");
 setInterval(()=>{if(session&&document.visibilityState==="visible")fetchAll();},15000);
 setInterval(()=>{if(session&&document.visibilityState==="visible")fetchCalendars(false);},600000);
 document.addEventListener("visibilitychange",()=>{if(session&&document.visibilityState==="visible")fetchAll();});
