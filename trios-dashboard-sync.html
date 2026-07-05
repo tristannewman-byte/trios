@@ -146,6 +146,8 @@ h2{font-size:15px;font-weight:700;margin:0}
 .calrow:last-child{border-bottom:none}
 .calrow .when{font:600 12px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);flex:none;width:96px}
 .calrow .cname{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.calrow.nowev{background:var(--amber-soft);border-radius:7px;padding-left:8px;padding-right:8px;border-bottom:none}
+.calrow.nowev .when{color:var(--amber)}
 .schedrow{display:flex;gap:10px;align-items:baseline;padding:7px 8px;border-radius:7px;margin-bottom:4px;font-size:13.5px;background:var(--card2)}
 .schedrow.task{background:var(--amber-soft);border-left:3px solid var(--amber)}
 .schedrow .when{font:600 12px var(--f-mono);font-variant-numeric:tabular-nums;flex:none;width:96px;color:var(--muted)}
@@ -370,6 +372,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
       <div class="panel">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <h2>Calendar</h2>
+          <span class="microlabel" id="calAge"></span>
           <button class="ghostbtn" id="calRefresh" style="margin-left:auto;padding:3px 10px">↻ refresh</button>
         </div>
         <div id="calList"></div>
@@ -752,13 +755,17 @@ function renderCalendar(){
   const cals=S.settings.calendars||[];
   if(!cals.length){el.innerHTML=`<div class="empty">No calendars connected yet. Add your secret iCal links in ⚙ settings — Google, iCloud, Outlook all work.</div>`;return;}
   const days=[["Today",todayStr()],["Tomorrow",tomorrowStr()]];
+  const nowD=new Date();
+  const age=document.getElementById("calAge");
+  if(age) age.textContent=calCache.fetched?"synced "+Math.max(0,Math.round((Date.now()-calCache.fetched)/60000))+"m ago":"";
   let html="";
   for(const [label,day] of days){
     const evs=calCache.events.filter(e=>new Date(e.start).toLocaleDateString("en-CA")===day);
     html+=`<div class="calday"><div class="microlabel" style="margin-bottom:4px">${label}</div>`;
     html+=evs.length?evs.map(e=>{
       const s=new Date(e.start), en=new Date(e.end);
-      return `<div class="calrow"><span class="when">${e.allDay?"all day":fmtT(s)+"–"+fmtT(en)}</span><span>${esc(e.title)}</span><span class="cname">${esc(e.cal)}</span></div>`;
+      const isNow=!e.allDay&&s<=nowD&&nowD<en;
+      return `<div class="calrow ${isNow?"nowev":""}"><span class="when">${e.allDay?"all day":fmtT(s)+"–"+fmtT(en)}</span><span>${esc(e.title)}</span>${isNow?'<span class="chip warn">now</span>':""}<span class="cname">${esc(e.cal)}</span></div>`;
     }).join(""):`<div class="calrow"><span class="when">—</span><span style="color:var(--muted)">clear</span></div>`;
     html+="</div>";
   }
@@ -867,6 +874,7 @@ document.getElementById("planBtn").addEventListener("click",async()=>{
 /* ================= domain logic ================= */
 const byId=id=>S.tasks.find(t=>t.id===id);
 const open=()=>S.tasks.filter(t=>t.status==="open");
+const overdue=()=>open().filter(t=>t.due&&t.due<todayStr());
 function mits(date){return S.tasks.filter(t=>t.mit===date);}
 const setMit=mutate(async(id,date)=>{
   const t=byId(id); if(!t)return;
@@ -1013,10 +1021,12 @@ function renderNotice(){
 }
 function renderTiles(){
   const per=d=>open().filter(t=>t.domain===d).length;
+  const od=overdue().length;
   document.getElementById("tiles").innerHTML=`
     <div class="tile"><div class="microlabel"><span class="dot ats"></span>ATS open</div><div class="num">${per("ats")}</div></div>
     <div class="tile"><div class="microlabel"><span class="dot promitor"></span>Promitor open</div><div class="num">${per("promitor")}</div></div>
     <div class="tile"><div class="microlabel"><span class="dot personal"></span>Personal open</div><div class="num">${per("personal")}</div></div>
+    <div class="tile"><div class="microlabel">Overdue</div><div class="num" style="${od?"color:var(--crit)":"color:var(--muted)"}">${od}</div></div>
     <div class="tile"><div class="microlabel">Ideas parked</div><div class="num">${S.ideas.length}</div></div>
     <div class="tile"><div class="microlabel">Learning active</div><div class="num">${S.learning.filter(l=>l.status==="active").length}</div></div>`;
 }
