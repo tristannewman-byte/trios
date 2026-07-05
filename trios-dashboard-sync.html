@@ -1,5 +1,10 @@
 <title>TriOS — Life Command Centre</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12161C">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 /* ---------- tokens ---------- */
 :root{
@@ -209,6 +214,29 @@ h2{font-size:15px;font-weight:700;margin:0}
 .idea .act button{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--card2);color:var(--muted)}
 .idea .act button:hover{color:var(--ink)}
 
+/* ---------- day timeline ---------- */
+#timeline{position:relative;border-left:2px solid var(--line);margin-left:46px}
+.tl-hour{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.tl-hour span{position:absolute;left:-48px;top:-8px;font:600 10.5px var(--f-mono);color:var(--muted)}
+.peakband{position:absolute;left:-2px;width:4px;background:var(--amber);opacity:.35;border-radius:2px}
+.tl-block{position:absolute;left:10px;right:0;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;background:var(--card2);border:1px solid var(--line);overflow:hidden;line-height:1.3}
+.tl-block .k{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.tl-block.meet{border-left:4px solid var(--muted)}
+.tl-block.deep{border-left:4px solid var(--amber);background:var(--amber-soft)}
+.tl-block.admin{border-left:4px solid var(--personal)}
+.tl-block.brk{border-left:4px solid var(--line2);color:var(--muted);background:var(--card)}
+.tl-block.done{opacity:.45}
+.tl-block.done .tt{text-decoration:line-through}
+.tl-block .act{position:absolute;top:3px;right:5px;display:flex;gap:2px}
+.tl-block .act button{width:20px;height:20px;font-size:11px;color:var(--muted);border-radius:4px}
+.tl-block .act button:hover{background:var(--card);color:var(--ink)}
+.tl-now{position:absolute;left:-5px;right:0;border-top:2px solid var(--crit);z-index:3}
+.tl-now::before{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:var(--crit);left:-4px;top:-5.5px}
+
+/* ---------- weekly review ---------- */
+#review{position:fixed;inset:0;background:var(--bg);z-index:350;display:none;overflow-y:auto;padding:26px 22px 60px}
+#review.open{display:block}
+
 /* ---------- search ---------- */
 #searchDlg{max-width:560px}
 #searchDlg input{width:100%;font-size:15px;padding:10px 12px}
@@ -351,8 +379,8 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 
 <!-- ============ HOME ============ -->
 <section data-view="today" class="active">
-  <h1 id="todayHead">Today</h1>
-  <p class="sub">Your Top 3, your calendar, and nothing that can wait.</p>
+  <div style="display:flex;align-items:baseline;gap:12px"><h1 id="todayHead">Today</h1><button class="ghostbtn" id="reviewBtn" style="margin-left:auto">Weekly review</button></div>
+  <p class="sub">Your Top 3, your day on a timeline, and nothing that can wait.</p>
   <div id="firstRun" hidden>
     <b>Welcome to TriOS synced.</b> This account is empty — how do you want to start?
     <div class="act">
@@ -370,17 +398,16 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
         <div id="mitsToday"></div>
       </div>
       <div class="panel">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <h2>Calendar</h2>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <h2>Your day</h2>
           <span class="microlabel" id="calAge"></span>
-          <button class="ghostbtn" id="calRefresh" style="margin-left:auto;padding:3px 10px">↻ refresh</button>
+          <button class="filebtn" id="planBtn" style="margin-left:auto;padding:5px 13px">✦ Plan my day</button>
+          <button class="ghostbtn" id="calRefresh" style="padding:5px 10px" title="refresh calendars">↻</button>
         </div>
-        <div id="calList"></div>
-        <div class="planhead">
-          <button class="filebtn" id="planBtn">Suggest my day</button>
-          <span class="microlabel">Claude plans around your calendar, peak hours and Top 3 — rules as fallback</span>
-        </div>
-        <div id="dayPlan"></div>
+        <div id="timeline"></div>
+        <div id="planAdvice"></div>
+        <div class="microlabel" style="margin:14px 0 4px">Tomorrow</div>
+        <div id="tomorrowList"></div>
       </div>
     </div>
     <div>
@@ -552,9 +579,21 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <div class="pbtns"><button id="pChange">Change view</button><button id="pExit">Exit (Esc)</button></div>
 </div>
 
+<!-- ============ WEEKLY REVIEW ============ -->
+<div id="review">
+  <div style="max-width:940px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+      <h1>Weekly review</h1>
+      <button class="ghostbtn" id="reviewClose" style="margin-left:auto">Close (Esc)</button>
+    </div>
+    <p class="sub">The last 7 days, honestly — then set up the week ahead.</p>
+    <div id="reviewBody"></div>
+  </div>
+</div>
+
 <!-- ============ SEARCH DIALOG ============ -->
 <dialog id="searchDlg">
-  <input type="text" id="searchInput" placeholder="Search tasks, ideas, learning, docs…" autocomplete="off">
+  <input type="text" id="searchInput" placeholder="Search — or command: add …, done …, plan, go work" autocomplete="off">
   <div id="searchResults"></div>
 </dialog>
 
@@ -584,6 +623,8 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
     <div style="display:flex;gap:8px;align-items:center"><input id="sWorkStart" type="number" min="0" max="23" style="width:80px"> to <input id="sWorkEnd" type="number" min="0" max="23" style="width:80px"></div></div>
   <div class="frow"><label>Calendar feeds — one per line: Name | secret iCal URL</label>
     <textarea id="sCals" rows="3" placeholder="Google | https://calendar.google.com/calendar/ical/…/basic.ics&#10;iCloud | webcal://p123-caldav.icloud.com/published/…"></textarea></div>
+  <div class="frow"><label>Alerts — this device, while TriOS is open</label>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:500;font-size:13.5px;text-transform:none;letter-spacing:0;color:var(--ink)"><input type="checkbox" id="sNotif"> Notify before meetings &amp; focus blocks, plus a morning Top-3 nudge</label></div>
   <p class="sub" style="margin:6px 0 12px">Signed in as <b id="sWho">—</b>. Data syncs via your Supabase project (Sydney).</p>
   <div class="dlgact" style="justify-content:flex-start;flex-wrap:wrap">
     <button class="ghostbtn" id="sExport">Export JSON</button>
@@ -750,28 +791,71 @@ async function fetchCalendars(force){
   renderCalendar();
 }
 document.getElementById("calRefresh").addEventListener("click",()=>fetchCalendars(true));
+const toMin=hm=>{const p=String(hm).split(":").map(Number);return p[0]*60+(p[1]||0);};
+function renderTimeline(){
+  const el=document.getElementById("timeline"); if(!el)return;
+  const H0=6,H1=20,PX=44;
+  const st=S.settings, today=todayStr(), nowD=new Date();
+  let html=`<div class="peakband" style="top:${(st.peakStart-H0)*PX}px;height:${(st.peakEnd-st.peakStart)*PX}px"></div>`;
+  for(let h=H0;h<=H1;h++) html+=`<div class="tl-hour" style="top:${(h-H0)*PX}px"><span>${String(h).padStart(2,"0")}:00</span></div>`;
+  const place=(sm,em,inner,cls)=>{
+    const top=Math.max(0,(sm-H0*60)/60*PX), hgt=Math.max(20,(em-sm)/60*PX-4);
+    return `<div class="tl-block ${cls}" style="top:${top}px;height:${hgt}px">${inner}</div>`;
+  };
+  calCache.events.filter(e=>!e.allDay&&new Date(e.start).toLocaleDateString("en-CA")===today).forEach(e=>{
+    const s=new Date(e.start),en=new Date(e.end);
+    const sm=s.getHours()*60+s.getMinutes(), em=en.getHours()*60+en.getMinutes();
+    if(em<=H0*60||sm>=H1*60)return;
+    const live=s<=nowD&&nowD<en;
+    html+=place(sm,em,`<span class="tt">${esc(e.title)}</span>${live?' <span class="chip warn">now</span>':""}<span class="k">${fmtT(s)}–${fmtT(en)} · ${esc(e.cal)||"meeting"}</span>`,"meet");
+  });
+  const plan=st.plan;
+  if(plan&&plan.date===today)(plan.blocks||[]).forEach((b,i)=>{
+    if(b.kind==="meeting")return;
+    const cls=(b.kind==="focus"?"deep":b.kind==="break"?"brk":"admin")+(b.done?" done":"");
+    html+=place(toMin(b.start),toMin(b.end),
+      `<span class="tt">${esc(b.title)}</span><span class="k">${esc(b.start)}–${esc(b.end)} · ${b.kind==="focus"?"deep work":b.kind}</span>
+       <span class="act">${b.kind!=="break"?`<button data-tact="done" data-i="${i}" title="mark done">✓</button>`:""}<button data-tact="del" data-i="${i}" title="remove block">✕</button></span>`,cls);
+  });
+  const nowM=nowD.getHours()*60+nowD.getMinutes();
+  if(nowM>=H0*60&&nowM<=H1*60) html+=`<div class="tl-now" style="top:${(nowM-H0*60)/60*PX}px"></div>`;
+  el.style.height=((H1-H0)*PX+6)+"px"; el.innerHTML=html;
+  const adv=document.getElementById("planAdvice");
+  if(plan&&plan.date===today){
+    adv.innerHTML=`${plan.advice?`<div class="sub" style="margin:8px 0 0">${esc(plan.advice)}</div>`:""}
+      <div class="sub" style="margin:4px 0 0">${plan.src==="ai"?`Planned by Claude · $${(plan.cost||0).toFixed(2)}`:"Rule-based plan"} · ✓ finishes a block, ✕ removes it.</div>`;
+  } else adv.innerHTML=`<div class="sub" style="margin:8px 0 0">No plan yet — “✦ Plan my day” lays your Top 3 into the gaps.</div>`;
+}
+function renderTomorrow(){
+  const el=document.getElementById("tomorrowList"); if(!el)return;
+  if(!(S.settings.calendars||[]).length){el.innerHTML=`<div class="empty" style="padding:8px">No calendar feeds yet — add your secret iCal links in ⚙ settings.</div>`;return;}
+  const evs=calCache.events.filter(e=>new Date(e.start).toLocaleDateString("en-CA")===tomorrowStr());
+  el.innerHTML=(evs.length?evs.map(e=>{const s=new Date(e.start),en=new Date(e.end);
+    return `<div class="calrow"><span class="when">${e.allDay?"all day":fmtT(s)+"–"+fmtT(en)}</span><span>${esc(e.title)}</span><span class="cname">${esc(e.cal)}</span></div>`;}).join("")
+    :`<div class="calrow"><span class="when">—</span><span style="color:var(--muted)">clear</span></div>`)
+    +(calCache.errors&&calCache.errors.length?`<div class="sub" style="margin-top:4px">⚠ ${esc(calCache.errors.join(" · "))}</div>`:"");
+}
 function renderCalendar(){
-  const el=document.getElementById("calList");
-  const cals=S.settings.calendars||[];
-  if(!cals.length){el.innerHTML=`<div class="empty">No calendars connected yet. Add your secret iCal links in ⚙ settings — Google, iCloud, Outlook all work.</div>`;return;}
-  const days=[["Today",todayStr()],["Tomorrow",tomorrowStr()]];
-  const nowD=new Date();
   const age=document.getElementById("calAge");
   if(age) age.textContent=calCache.fetched?"synced "+Math.max(0,Math.round((Date.now()-calCache.fetched)/60000))+"m ago":"";
-  let html="";
-  for(const [label,day] of days){
-    const evs=calCache.events.filter(e=>new Date(e.start).toLocaleDateString("en-CA")===day);
-    html+=`<div class="calday"><div class="microlabel" style="margin-bottom:4px">${label}</div>`;
-    html+=evs.length?evs.map(e=>{
-      const s=new Date(e.start), en=new Date(e.end);
-      const isNow=!e.allDay&&s<=nowD&&nowD<en;
-      return `<div class="calrow ${isNow?"nowev":""}"><span class="when">${e.allDay?"all day":fmtT(s)+"–"+fmtT(en)}</span><span>${esc(e.title)}</span>${isNow?'<span class="chip warn">now</span>':""}<span class="cname">${esc(e.cal)}</span></div>`;
-    }).join(""):`<div class="calrow"><span class="when">—</span><span style="color:var(--muted)">clear</span></div>`;
-    html+="</div>";
-  }
-  if(calCache.errors&&calCache.errors.length) html+=`<div class="sub" style="margin:4px 0 0">⚠ ${esc(calCache.errors.join(" · "))}</div>`;
-  el.innerHTML=html;
+  renderTimeline(); renderTomorrow();
 }
+document.getElementById("timeline").addEventListener("click",e=>{
+  const b=e.target.closest("[data-tact]"); if(!b)return;
+  const plan=S.settings.plan; if(!plan)return;
+  const i=+b.dataset.i, blk=(plan.blocks||[])[i]; if(!blk)return;
+  let taskPatch=null;
+  if(b.dataset.tact==="del") plan.blocks.splice(i,1);
+  else{
+    blk.done=!blk.done;
+    if(blk.task_id&&blk.done){const t=byId(blk.task_id);
+      if(t&&t.status==="open"){t.status="done";t.done_at=new Date().toISOString();taskPatch=t;}}
+  }
+  mutate(async()=>{
+    if(taskPatch) await dbUpdate("tasks",taskPatch.id,{status:"done",done_at:taskPatch.done_at});
+    await saveSettings();
+  })();
+});
 
 /* ---------- suggest my day (rule-based) ---------- */
 function mergeBusy(evts){
@@ -824,51 +908,40 @@ function buildPlan(){
   ].sort((a,b)=>a.s-b.s);
   return {rows,unplaced};
 }
-function renderRulePlan(prefix){
-  const plan=buildPlan();
-  const el=document.getElementById("dayPlan");
-  if(plan.note){el.innerHTML=`<div class="empty">${prefix?esc(prefix)+" — ":""}${plan.note}</div>`;return;}
-  let html=prefix?`<div class="sub" style="margin-bottom:6px">${esc(prefix)}</div>`:"";
-  html+=plan.rows.map(r=>r.kind==="event"
-    ?`<div class="schedrow"><span class="when">${fmtT(r.s)}–${fmtT(r.e)}</span><span class="what">${esc(r.title)}</span><span class="microlabel">meeting</span></div>`
-    :`<div class="schedrow task"><span class="when">${fmtT(r.s)}–${fmtT(r.e)}</span><span class="what">${r.mit?"★ ":""}${esc(r.t.title)}</span>${energyChip(r.t.energy)}</div>`
-  ).join("");
-  if(plan.unplaced&&plan.unplaced.length) html+=`<div class="sub" style="margin-top:6px">Couldn't fit: ${plan.unplaced.map(t=>esc(t.title)).join(" · ")} — the day's full.</div>`;
-  html+=`<div class="sub" style="margin-top:6px">Rule-based plan — deep work in your peak window (${S.settings.peakStart}:00–${S.settings.peakEnd}:00), light tasks after.</div>`;
-  el.innerHTML=html;
-}
-function renderAIPlan(j){
-  const el=document.getElementById("dayPlan");
-  const kinds={focus:"deep work",meeting:"meeting",admin:"admin",break:"break"};
-  let html=(j.plan.blocks||[]).map(b=>{
-    const isTask=b.kind==="focus"||b.kind==="admin";
-    return `<div class="schedrow ${isTask?"task":""}"><span class="when">${esc(b.start)}–${esc(b.end)}</span><span class="what">${esc(b.title)}</span><span class="microlabel">${kinds[b.kind]||esc(b.kind)}</span></div>`;
-  }).join("")||`<div class="empty">Claude returned an empty plan — star some tasks first.</div>`;
-  if(j.plan.advice) html+=`<div class="sub" style="margin-top:6px">${esc(j.plan.advice)}</div>`;
-  html+=`<div class="sub" style="margin-top:4px">Planned by Claude · $${(j.cost_usd||0).toFixed(2)} · a suggestion, not a contract.</div>`;
-  el.innerHTML=html;
-}
 const hhmmLocal=d=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+function rowsToBlocks(plan){
+  const blocks=(plan.rows||[]).filter(r=>r.kind!=="event").map(r=>({
+    start:hhmmLocal(r.s),end:hhmmLocal(r.e),
+    title:(r.mit?"★ ":"")+r.t.title,
+    kind:r.t.energy==="high"?"focus":"admin",task_id:r.t.id}));
+  const advice=plan.note||((plan.unplaced&&plan.unplaced.length)?("Couldn't fit: "+plan.unplaced.map(t=>t.title).join(" · ")):"");
+  return {blocks,advice};
+}
 document.getElementById("planBtn").addEventListener("click",async()=>{
-  const el=document.getElementById("dayPlan");
-  el.innerHTML=`<div class="empty">Asking Claude to plan your day…</div>`;
+  const btn=document.getElementById("planBtn"), old=btn.textContent;
+  btn.textContent="Planning…"; btn.disabled=true;
   const today=todayStr(), now=new Date();
   try{
     const j=await fnCall("plan-day",{
       now:hhmmLocal(now),
-      settings:S.settings&&{peakStart:S.settings.peakStart,peakEnd:S.settings.peakEnd,workStart:S.settings.workStart,workEnd:S.settings.workEnd},
+      settings:{peakStart:S.settings.peakStart,peakEnd:S.settings.peakEnd,workStart:S.settings.workStart,workEnd:S.settings.workEnd},
       top3:mits(today).filter(t=>t.status==="open").map(t=>({id:t.id,title:t.title,domain:t.domain,energy:t.energy})),
       otherTasks:open().filter(t=>t.mit!==today).slice(0,25).map(t=>({id:t.id,title:t.title,domain:t.domain,energy:t.energy,due:t.due})),
       events:calCache.events.filter(e=>!e.allDay&&new Date(e.start).toLocaleDateString("en-CA")===today&&new Date(e.end)>now)
         .map(e=>({title:e.title,start:hhmmLocal(new Date(e.start)),end:hhmmLocal(new Date(e.end))}))
     });
-    renderAIPlan(j);
+    const blocks=(j.plan.blocks||[]).filter(b=>b.kind!=="meeting");
+    S.settings.plan={date:today,blocks,advice:j.plan.advice||"",cost:j.cost_usd||0,src:"ai"};
+    mutate(async()=>{await saveSettings();})();
     registerAutomation("ai-planner","AI day planner",
-      "Claude Opus plans the rest of your day around your calendar, peak hours, and Top 3. Runs from the Suggest my day button.");
-    fetchAll();
+      "Claude Opus plans the rest of your day around your calendar, peak hours, and Top 3. Runs from the Plan my day button.");
   }catch(ex){
-    renderRulePlan("Claude unavailable ("+String(ex.message||ex).slice(0,80)+") — falling back to rules");
-  }
+    const rb=rowsToBlocks(buildPlan());
+    S.settings.plan={date:today,blocks:rb.blocks,
+      advice:(rb.advice?rb.advice+" · ":"")+"Claude unavailable — rule-based fallback ("+String(ex.message||ex).slice(0,60)+")",
+      cost:0,src:"rules"};
+    mutate(async()=>{await saveSettings();})();
+  }finally{btn.textContent=old;btn.disabled=false;}
 });
 
 /* ================= domain logic ================= */
@@ -942,6 +1015,7 @@ function captureToast(res){
 document.getElementById("qcap").addEventListener("keydown",e=>{
   if(e.key==="Enter"&&e.target.value.trim()){
     const text=e.target.value.trim(); e.target.value="";
+    if(!navigator.onLine){queueCapture(text);toast("Offline — queued, sends when you're back online");return;}
     mutate(async()=>{const res=await captureText(text); captureToast(res);})();
   }
 });
@@ -1395,10 +1469,58 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="/"&&!searchDlg.open&&!e.target.closest("input,textarea,select")){e.preventDefault(); openSearch();}
 });
 document.getElementById("searchInput").addEventListener("input",e=>renderSearch(e.target.value));
+const PALETTE=[
+  ["add <text>","capture straight to the inbox"],
+  ["done <task>","complete the first matching task"],
+  ["star <task>","star a task for tomorrow's 3"],
+  ["plan","have Claude plan the rest of today"],
+  ["sort","sort the inbox — rules + Claude"],
+  ["review","open the weekly review"],
+  ["go <view>","home · dump · tasks · work · learn · auto · system"],
+  ["project <board>","work · today3 · ideas · learn"]];
+function runCommand(raw){
+  const q=raw.trim(); let m;
+  const fin=()=>{searchDlg.close();return true;};
+  if(m=q.match(/^add\s+(.+)/i)){const text=m[1];mutate(async()=>{captureToast(await captureText(text));})();return fin();}
+  if(m=q.match(/^(done|star)\s+(.+)/i)){
+    const verb=m[1].toLowerCase(), s=m[2].toLowerCase();
+    const t=open().find(x=>x.title.toLowerCase().includes(s));
+    if(!t){toast("No open task matches “"+m[2].slice(0,40)+"”");return fin();}
+    if(verb==="star"){setMit(t.id,tomorrowStr());}
+    else{t.status="done";t.done_at=new Date().toISOString();
+      mutate(async()=>{await dbUpdate("tasks",t.id,{status:"done",done_at:t.done_at});})();
+      toast("Done: "+t.title.slice(0,60));}
+    return fin();
+  }
+  if(/^plan$/i.test(q)){setNav("today");document.getElementById("planBtn").click();return fin();}
+  if(/^sort$/i.test(q)){setNav("dump");document.getElementById("sortInbox").click();return fin();}
+  if(/^review$/i.test(q)){openReview();return fin();}
+  if(m=q.match(/^go\s+(\w+)/i)){
+    const v=({home:"today"})[m[1].toLowerCase()]||m[1].toLowerCase();
+    if(document.querySelector(`section[data-view="${v}"]`)){setNav(v);return fin();}
+    toast("Views: home · dump · tasks · work · learn · auto · system");return fin();
+  }
+  if(m=q.match(/^project\s+(\w+)/i)){
+    const v=m[1].toLowerCase();
+    if(P_TITLES[v]){localStorage.setItem(PKEY,v);openProject(v);return fin();}
+    toast("Boards: work · today3 · ideas · learn");return fin();
+  }
+  return false;
+}
+document.getElementById("searchInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&runCommand(e.target.value)) e.preventDefault();
+});
 function renderSearch(q){
   const el=document.getElementById("searchResults");
   q=q.trim().toLowerCase();
-  if(q.length<2){el.innerHTML=`<div class="empty">Type two letters or more. Searches tasks, ideas, learning, inbox, and your registered docs.</div>`;return;}
+  if(q.length<2){
+    el.innerHTML=`<div class="srgroup"><div class="microlabel">Commands</div>${PALETTE.map(([c,h])=>
+      `<div class="srrow"><span class="ttl" style="font-family:var(--f-mono);font-size:12.5px">${c}</span><span class="loc">${h}</span></div>`).join("")}
+      <div class="sub" style="margin-top:6px">…or just type to search everything.</div></div>`;
+    return;
+  }
+  const cmdHint=/^(add|done|star|plan|sort|review|go|project)\b/i.test(q)
+    ?`<div class="srgroup"><div class="microlabel">Command</div><div class="srrow"><span class="ttl" style="font-family:var(--f-mono);font-size:12.5px">↵ ${esc(q)}</span><span class="loc">press Enter to run</span></div></div>`:"";
   const m=s=>s&&String(s).toLowerCase().includes(q);
   const groups=[];
   const tasks=S.tasks.filter(t=>m(t.title)||m(t.notes)).slice(0,12);
@@ -1416,7 +1538,7 @@ function renderSearch(q){
   const arts=S.artifacts.filter(a=>m(a.name)||m(a.location)||m(a.tags)).slice(0,8);
   if(arts.length) groups.push(`<div class="srgroup"><div class="microlabel">Artifacts & docs</div>${arts.map(a=>`
     <button class="srrow" data-sr-art="${a.id}"><span class="ttl">${esc(a.name)}</span><span class="loc">${esc(a.location)}</span></button>`).join("")}</div>`);
-  el.innerHTML=groups.join("")||`<div class="empty">No matches for “${esc(q)}”.</div>`;
+  el.innerHTML=cmdHint+(groups.join("")||`<div class="empty">No matches for “${esc(q)}”.</div>`);
 }
 document.getElementById("searchResults").addEventListener("click",e=>{
   const tb=e.target.closest("[data-sr-task]");
@@ -1476,6 +1598,7 @@ document.getElementById("settingsBtn").addEventListener("click",()=>{
   document.getElementById("sWorkEnd").value=S.settings.workEnd;
   document.getElementById("sCals").value=(S.settings.calendars||[]).map(c=>c.name?c.name+" | "+c.url:c.url).join("\n");
   document.getElementById("sWho").textContent=session&&session.user?session.user.email:"—";
+  document.getElementById("sNotif").checked=localStorage.getItem("trios.notif")==="1"&&("Notification" in window)&&Notification.permission==="granted";
   setDlg.showModal();
 });
 document.getElementById("sClose").addEventListener("click",()=>{
@@ -1566,7 +1689,11 @@ let pView=null;
 document.getElementById("projectBtn").addEventListener("click",()=>{pView=localStorage.getItem(PKEY)||null; openProject(pView);});
 document.getElementById("pExit").addEventListener("click",closeProject);
 document.getElementById("pChange").addEventListener("click",()=>{pView=null;localStorage.removeItem(PKEY);renderProject();});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&proj.classList.contains("open"))closeProject();});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  if(proj.classList.contains("open"))closeProject();
+  else if(document.getElementById("review").classList.contains("open"))closeReview();
+});
 function openProject(v){pView=v;proj.classList.add("open");renderProject();}
 function closeProject(){proj.classList.remove("open");}
 const P_TITLES={work:"ATS · Work Board",today3:"Today's 3",ideas:"Ideas Wall",learn:"Learning Hub"};
@@ -1614,16 +1741,127 @@ document.getElementById("pbody").addEventListener("click",e=>{
   pView=b.dataset.pv; localStorage.setItem(PKEY,pView); renderProject();
 });
 
+/* ================= weekly review ================= */
+function openReview(){document.getElementById("review").classList.add("open");renderReview();}
+function closeReview(){document.getElementById("review").classList.remove("open");}
+document.getElementById("reviewBtn").addEventListener("click",openReview);
+document.getElementById("reviewClose").addEventListener("click",closeReview);
+function renderReview(){
+  const cut=Date.now()-7*864e5, cutIso=new Date(cut).toISOString();
+  const doneT=S.tasks.filter(t=>t.done_at&&+new Date(t.done_at)>=cut);
+  const runs=S.automation_runs.filter(r=>(r.started_at||"")>=cutIso);
+  const cost=runs.reduce((a,r)=>a+(+r.cost_usd||0),0), fails=runs.filter(r=>r.ok===false).length;
+  const od=overdue(), tom=tomorrowStr();
+  const doneList=d=>doneT.filter(t=>t.domain===d).map(t=>
+    `<div class="pickrow"><span class="dot ${d}"></span><span class="ttl">${esc(t.title)}</span></div>`).join("")||`<div class="empty" style="padding:6px">none</div>`;
+  document.getElementById("reviewBody").innerHTML=`
+   <div class="tiles">
+     <div class="tile"><div class="microlabel">Done · 7 days</div><div class="num">${doneT.length}</div></div>
+     <div class="tile"><div class="microlabel">Still open</div><div class="num">${open().length}</div></div>
+     <div class="tile"><div class="microlabel">Overdue</div><div class="num" style="${od.length?"color:var(--crit)":"color:var(--muted)"}">${od.length}</div></div>
+     <div class="tile"><div class="microlabel">AI spend · 7d</div><div class="num">$${cost.toFixed(2)}</div></div>
+     <div class="tile"><div class="microlabel">Automation runs</div><div class="num">${runs.length}${fails?` <span style="font-size:13px;color:var(--crit)">${fails}✗</span>`:""}</div></div>
+   </div>
+   <div class="sysgrid">
+     <div class="panel"><h2 style="margin-bottom:8px">Shipped, by area</h2>
+       <div class="microlabel">ATS</div>${doneList("ats")}
+       <div class="microlabel" style="margin-top:10px">Promitor</div>${doneList("promitor")}
+       <div class="microlabel" style="margin-top:10px">Personal</div>${doneList("personal")}
+     </div>
+     <div>
+       <div class="panel" style="margin-bottom:14px"><h2 style="margin-bottom:8px">Deal with the stragglers</h2>
+        ${od.length?od.map(t=>`<div class="pickrow"><span class="dot ${t.domain}"></span><span class="ttl">${esc(t.title)}</span><span class="chip crit">${t.due}</span></div>`).join(""):`<div class="empty">Nothing overdue. Clean week.</div>`}
+       </div>
+       <div class="panel"><h2 style="margin-bottom:2px">Pick the week's first 3</h2>
+        <p class="sub" style="margin-bottom:8px">Stars land in tomorrow's Top 3 (${mits(tom).length}/3 picked).</p>
+        ${open().slice(0,20).map(t=>`<div class="pickrow"><button class="starbtn ${t.mit===tom?"on":""}" data-rstar="${t.id}">★</button><span class="ttl">${esc(t.title)}</span><span class="dot ${t.domain}"></span></div>`).join("")||`<div class="empty">No open tasks.</div>`}
+       </div>
+     </div>
+   </div>`;
+}
+document.getElementById("review").addEventListener("click",e=>{
+  const b=e.target.closest("[data-rstar]"); if(!b)return;
+  setMit(b.dataset.rstar,tomorrowStr());
+  setTimeout(renderReview,250);
+});
+
+/* ================= offline capture queue + share target ================= */
+(function(){try{
+  const p=new URLSearchParams(location.search);
+  if(p.has("text")||p.has("title")||p.has("url")){
+    const txt=[p.get("title"),p.get("text"),p.get("url")].filter(Boolean).join(" — ").trim();
+    if(txt){const q=JSON.parse(localStorage.getItem("trios.outbox")||"[]");q.push(txt);localStorage.setItem("trios.outbox",JSON.stringify(q));}
+    history.replaceState(null,"",location.pathname+location.hash);
+  }
+}catch(e){}})();
+function queueCapture(text){
+  const q=JSON.parse(localStorage.getItem("trios.outbox")||"[]");
+  q.push(text); localStorage.setItem("trios.outbox",JSON.stringify(q));
+}
+function flushOutbox(){
+  if(!session||!navigator.onLine)return;
+  let q=[]; try{q=JSON.parse(localStorage.getItem("trios.outbox")||"[]");}catch(e){}
+  if(!q.length)return;
+  localStorage.setItem("trios.outbox","[]");
+  mutate(async()=>{
+    for(const text of q) await captureText(text);
+    toast(q.length+" queued capture"+(q.length>1?"s":"")+" delivered");
+  })();
+}
+window.addEventListener("online",flushOutbox);
+
+/* ================= notifications (while a TriOS tab is open) ================= */
+const notified=new Set();
+function notify(title,body){try{new Notification(title,{body,icon:"icon-192.png"});}catch(e){}}
+function notifTick(){
+  if(localStorage.getItem("trios.notif")!=="1"||!("Notification" in window)||Notification.permission!=="granted")return;
+  const now=new Date(), key=todayStr();
+  if(now.getHours()===(+S.settings.peakStart||6)&&now.getMinutes()<2&&localStorage.getItem("trios.nudge")!==key){
+    localStorage.setItem("trios.nudge",key);
+    const n=mits(key).length;
+    notify("TriOS — morning",n?("Top "+n+" set. First deep block is yours."):"No Top 3 set yet — pick your 3 before the day picks for you.");
+  }
+  calCache.events.forEach(e=>{
+    if(e.allDay)return;
+    const s=new Date(e.start);
+    if(s.toLocaleDateString("en-CA")!==key)return;
+    const d=(s-now)/60000, id="e"+e.start+e.title;
+    if(d>3.5&&d<=6&&!notified.has(id)){notified.add(id);notify(e.title,"Starts "+fmtT(s));}
+  });
+  const plan=S.settings.plan;
+  if(plan&&plan.date===key)(plan.blocks||[]).forEach(b=>{
+    if(b.done||b.kind==="meeting")return;
+    const t=new Date(); const [h,m]=String(b.start).split(":").map(Number); t.setHours(h,m||0,0,0);
+    const d=(t-now)/60000, id="b"+b.start+b.title;
+    if(d>3.5&&d<=6&&!notified.has(id)){notified.add(id);notify(b.title,(b.kind==="break"?"Break":"Focus block")+" at "+b.start);}
+  });
+}
+document.getElementById("sNotif").addEventListener("change",async e=>{
+  if(e.target.checked){
+    if(!("Notification" in window)){toast("This browser doesn't support notifications");e.target.checked=false;return;}
+    const p=await Notification.requestPermission();
+    if(p!=="granted"){toast("Permission declined — alerts stay off");e.target.checked=false;return;}
+    localStorage.setItem("trios.notif","1");
+    notify("TriOS","Alerts on: meetings, focus blocks, and the morning nudge.");
+  } else localStorage.removeItem("trios.notif");
+});
+
 /* ================= boot + polling ================= */
 async function boot(){
   tickClock();
   await fetchAll();
   fetchCalendars(false);
+  flushOutbox();
+  notifTick();
   if(location.hash.startsWith("#project=")){
     const v=location.hash.split("=")[1];
     if(P_TITLES[v]){openProject(v); localStorage.setItem(PKEY,v);}
   }
 }
+if(location.protocol.startsWith("http")&&"serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+setInterval(notifTick,60000);
 setInterval(()=>{if(session&&document.visibilityState==="visible")fetchAll();},15000);
 setInterval(()=>{if(session&&document.visibilityState==="visible")fetchCalendars(false);},600000);
 document.addEventListener("visibilitychange",()=>{if(session&&document.visibilityState==="visible")fetchAll();});
